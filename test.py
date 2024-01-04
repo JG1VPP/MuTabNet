@@ -1,0 +1,66 @@
+import argparse
+import json
+import lzma
+import os
+import pickle
+from glob import glob
+from pathlib import Path
+
+import numpy as np
+from more_itertools import divide
+from torch.multiprocessing import set_start_method
+from tqdm import tqdm
+
+from mutab.apis import evaluate
+from mutab.utils import visualize_bbox
+
+EASY = "simple"
+HARD = "complex"
+
+
+def main():
+    args = argparse.ArgumentParser()
+    args.add_argument("--gpus", type=int, default=4)
+    args.add_argument("--show", action="store_true")
+    args.add_argument("--ckpt", type=str, default="latest.pth")
+    args.add_argument("--save", type=str, default="results.xz")
+    args.add_argument("--json", type=str, required=True)
+    args.add_argument("--conf", type=str, required=True)
+    args.add_argument("--path", type=str, required=True)
+    args = args.parse_args()
+
+    root = Path(args.ckpt).parent.expanduser()
+
+    with open(args.json) as f:
+        jsonl_ground_truth = json.load(f)
+
+    set_start_method("spawn")
+    paths = divide(args.gpus, glob(os.path.join(args.path, "*.png")))
+    items = evaluate(paths, args.conf, args.ckpt, jsonl_ground_truth)
+
+    easy = list(v for v in items.values() if v["type"] == EASY)
+    hard = list(v for v in items.values() if v["type"] == HARD)
+
+    summary = {}
+    summary.update(html=np.mean([v["TEDS"]["html"] for v in items.values()]))
+    summary.update(full=np.mean([v["TEDS"]["full"] for v in items.values()]))
+    summary.update(easy=np.mean([v["TEDS"]["full"] for v in easy]))
+    summary.update(hard=np.mean([v["TEDS"]["full"] for v in hard]))
+
+    with open(root.joinpath("{}.log".format(args.save)), "w") as f:
+        print(f"{len(items)} samples", file=f)
+        print(f"AVG TEDS html score: {summary['html']}", file=f)
+        print(f"AVG TEDS full score: {summary['full']}", file=f)
+        print(f"AVG TEDS easy score: {summary['easy']}", file=f)
+        print(f"AVG TEDS hard score: {summary['hard']}", file=f)
+
+    with lzma.open(root.joinpath(args.save), "wb") as f:
+        pickle.dump(dict(results=items, summary=summary, **vars(args)), f)
+
+    if args.show:
+        for name, item in tqdm(list(items.items())):
+            visualize_bbox(**item, save=root)
+
+
+if __name__ == "__main__":
+    main()

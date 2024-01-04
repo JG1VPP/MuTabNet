@@ -1,0 +1,60 @@
+type: FinTabNet
+load:
+  dir: ~/data/fintabnet/img_tables/
+  jsonl:
+  - ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_train.jsonl
+  - ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_val.jsonl
+  - ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_test.jsonl
+dump:
+  dir: ~/data/mmocr_fintabsub/
+  json: ~/data/ground_truth_fintabsub.json
+  split: val
+samples: 64
+replace:
+  []: "<eb></eb>"
+  [' ']: "<eb></eb>"
+  ['<b>', ' ', '</b>']: "<eb></eb>"
+  ['<sup>', ' ', '</sup>']: "<eb></eb>"
+  ['<i>', ' ', '</i>']: "<eb></eb>"
+  ['<i>', '</i>']: "<eb></eb>"
+  ['<sup>', '</sup>']: "<eb></eb>"
+  [' ', '<i>', '</i>']: "<eb></eb>"
+  [' ', '<sup>', '</sup>']: "<eb></eb>"
+  [' ', ' ']: "<eb></eb>"
+  [' ', '<i>', '</i>', '<i>', '</i>', ' ', '<i>', '</i>']: "<eb></eb>"
+  [' ', '<i>', '</i>', ' ']: "<eb></eb>"
+  [' ', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', ' ', '</sup>', ' ']: "<eb></eb>"
+  ['<sup>', '</sup>', '<sup>', '</sup>']: "<eb></eb>"
+  [' ', ' ', ' ']: "<eb></eb>"
+  [' ', ' ', '<i>', '<sup>', '</sup>', '</i>', ' ']: "<eb></eb>"
+  ['<i>', '<sup>', '</sup>', '</i>']: "<eb></eb>"
+  ['<i>', '</i>', '<i>', '</i>']: "<eb></eb>"
+  [' ', '<i>', '</i>', '<i>', '</i>', '<i>', '</i>']: "<eb></eb>"
+  [' ', '<sup>', ' ', '</sup>']: "<eb></eb>"
+  ['<sup>', ' ', '</sup>', '<sup>', ' ', '</sup>']: "<eb></eb>"
+  ['<sup>', ' ', '</sup>', '<sup>', '</sup>']: "<eb></eb>"
+  ['<sup>', '<i>', '</i>', '</sup>']: "<eb></eb>"
+  [' ', ' ', ' ', ' ', '<i>', '</i>', ' ']: "<eb></eb>"
+  ['<i>', '</i>', '<i>', '</i>', '<i>', '</i>', '<i>', '</i>']: "<eb></eb>"
+  [' ', ' ', ' ', ' ']: "<eb></eb>"
+  [' ', ' ', ' ', ' ', ' ']: "<eb></eb>"
+  [' ', ' ', ' ', ' ', ' ', ' ']: "<eb></eb>"
+  ['<i>', '</i>', ' ', '<i>', '</i>', '<i>', '</i>']: "<eb></eb>"
+  [' ', ' ', '<i>', '</i>']: "<eb></eb>"
+  [' ', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', ' ', ' ', '</sup>', ' ']: "<eb></eb>"
+  [' ', '<sup>', '</sup>', '<sup>', '</sup>']: "<eb></eb>"
+  ['<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>']: "<eb></eb>"
+  [' ', ' ', ' ', '<i>', '</i>']: "<eb></eb>"
+  [' ', ' ', ' ', '<i>', '</i>', ' ']: "<eb></eb>"
+  [' ', '<i>', '</i>', ' ', ' ', '<i>', '</i>']: "<eb></eb>"
+  ['<i>', '</i>', ' ', '<i>', '</i>']: "<eb></eb>"
+  [' ', ' ', ' ', ' ', '<i>', '</i>']: "<eb></eb>"
+  [' ', ' ', ' ', '<sup>', '</sup>']: "<eb></eb>"
+  [' ', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>']: "<eb></eb>"
+  ['<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>', '<sup>', '</sup>']: "<eb></eb>"
+  [' ', '<i>', ' ', '</i>']: "<eb></eb>"
+  ['<sub>', '</sub>', '<sub>', '</sub>', '<sup>', '</sup>', ' ']: "<eb></eb>"
+  ['<sub>', '</sub>', '<sup>', '</sup>', ' ']: "<eb></eb>"
+  ['<sup>', '</sup>', ' ']: "<eb></eb>"
+  [' ', ' ', '<i>', '</i>', ' ']: "<eb></eb>"
+  [' ', ' ', '<sup>', '</sup>']: "<eb></eb>"

@@ -1,0 +1,25 @@
+type: PubTabNet
+load:
+  dir: ~/data/pubtabnet/
+  jsonl:
+  - ~/data/pubtabnet/PubTabNet_2.0.0.jsonl
+dump:
+  dir: ~/data/mmocr_pubtabsub/
+  json: ~/data/ground_truth_pubtabsub.json
+  split: val
+seq_len:
+  html:
+    min: 250
+samples: 64
+replace:
+  []: "<eb></eb>"
+  [' ']: "<eb1></eb1>"
+  ['<b>', ' ', '</b>']: "<eb2></eb2>"
+  ["\u2028", "\u2028"]: "<eb3></eb3>"
+  ['<sup>', ' ', '</sup>']: "<eb4></eb4>"
+  ['<b>', '</b>']: "<eb5></eb5>"
+  ['<i>', ' ', '</i>']: "<eb6></eb6>"
+  ['<b>', '<i>', '</i>', '</b>']: "<eb7></eb7>"
+  ['<b>', '<i>', ' ', '</i>', '</b>']: "<eb8></eb8>"
+  ['<i>', '</i>']: "<eb9></eb9>"
+  ['<b>', ' ', "\u2028", ' ', "\u2028", ' ', '</b>']: "<eb10></eb10>"
