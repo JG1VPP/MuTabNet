@@ -3,6 +3,8 @@ import json
 import lzma
 import os
 import pickle
+import time
+from datetime import timedelta as td
 from glob import glob
 from pathlib import Path
 
@@ -35,8 +37,10 @@ def main():
         jsonl_ground_truth = json.load(f)
 
     set_start_method("spawn")
+    count = time.perf_counter()
     paths = divide(args.gpus, glob(os.path.join(args.path, "*.png")))
     items = evaluate(paths, args.conf, args.ckpt, jsonl_ground_truth)
+    count = td(seconds=time.perf_counter() - count) / td(hours=1)
 
     easy = list(v for v in items.values() if v["type"] == EASY)
     hard = list(v for v in items.values() if v["type"] == HARD)
@@ -48,11 +52,11 @@ def main():
     summary.update(hard=np.mean([v["TEDS"]["full"] for v in hard]))
 
     with open(root.joinpath("{}.log".format(args.save)), "w") as f:
-        print(f"{len(items)} samples", file=f)
-        print(f"AVG TEDS html score: {summary['html']}", file=f)
-        print(f"AVG TEDS full score: {summary['full']}", file=f)
-        print(f"AVG TEDS easy score: {summary['easy']}", file=f)
-        print(f"AVG TEDS hard score: {summary['hard']}", file=f)
+        print(f"{len(items)} samples in {count:.2f} hours:", file=f)
+        print(f"AVG TEDS html score: {summary['html']:.4f}", file=f)
+        print(f"AVG TEDS full score: {summary['full']:.4f}", file=f)
+        print(f"AVG TEDS easy score: {summary['easy']:.4f}", file=f)
+        print(f"AVG TEDS hard score: {summary['hard']:.4f}", file=f)
 
     with lzma.open(root.joinpath(args.save), "wb") as f:
         pickle.dump(dict(results=items, summary=summary, **vars(args)), f)
