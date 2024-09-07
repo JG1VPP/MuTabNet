@@ -97,9 +97,22 @@ For FinTabNet, we use validation set including 10,656 tables as test set in imit
 
 ## Requirements
 
-We recommend that you use at least four V100 32GB GPUs or one A100 80GB GPU.
+We recommend that you use at least four V100 32GB GPUs or two A100 80GB GPU.
 
 ## License
 
 This project is licensed under the MIT License.
 See LICENSE for more details.
+
+## Citation
+
+```latex
+@inproceedings{ICDAR24KAT,
+  author={Takaya Kawakatsu},
+  title={Multi-Cell Decoder and Mutual Learning for Table Structure and Character Recognition},
+  booktitle={Document Analysis and Recognition - ICDAR 2024},
+  publisher={Springer Nature Switzerland},
+  year={2024},
+  pages={389--405},
+}
+```
