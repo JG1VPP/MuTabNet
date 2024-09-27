@@ -88,10 +88,10 @@ class TEDS:
         parser = html.HTMLParser(remove_comments=True, encoding="utf-8")
         pred = html.fromstring(pred, parser=parser)
         real = html.fromstring(real, parser=parser)
-        pred_table = pred.xpath("table")
-        real_table = real.xpath("table")
-        pred = pred_table[0] if len(pred_table) else pred
-        real = real_table[0] if len(real_table) else real
+        pred = next(iter(pred.xpath("//table")), pred)
+        real = next(iter(real.xpath("//table")), real)
+        assert pred.tag in ("div", "table")
+        assert real.tag in ("div", "table")
         if self.ignore_tags:
             etree.strip_tags(pred, *self.ignore_tags)
             etree.strip_tags(real, *self.ignore_tags)
