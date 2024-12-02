@@ -29,6 +29,7 @@ revisions = {
 
 cell_tokens = ["<td></td>", "<td", *eb_tokens]
 
+gca = ["GCA"]
 gcb = dict(ratio=0.0625, heads=1)
 
 model = dict(
@@ -37,10 +38,10 @@ model = dict(
         type="TableResNet",
         dim=3,
         out=512,
-        gcb1=dict(depth=1, gc=False, **gcb),
-        gcb2=dict(depth=2, gc=True, **gcb),
-        gcb3=dict(depth=5, gc=True, **gcb),
-        gcb4=dict(depth=3, gc=True, **gcb),
+        gcb1=dict(depth=1, **gcb),
+        gcb2=dict(depth=2, **gcb, gca=gca),
+        gcb3=dict(depth=5, **gcb, gca=gca),
+        gcb4=dict(depth=3, **gcb, gca=gca),
     ),
     encoder=dict(
         type="PositionalEncoding2D",

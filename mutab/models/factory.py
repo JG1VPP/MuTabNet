@@ -5,6 +5,7 @@ HANDLERS = Registry("handler")
 ENCODERS = Registry("encoder")
 DECODERS = Registry("decoder")
 ATTENTIONS = Registry("attentions")
+GC_MODULES = Registry("gc-modules")
 
 
 def build_from_dict(cfg, registry, **kwargs):
@@ -33,6 +34,10 @@ def build_handler(cfg, **kwargs):
 
 def build_loss(cfg, **kwargs):
     return build_from_dict(cfg, LOSSES, **kwargs)
+
+
+def build_gc_module(cfg, **kwargs):
+    return build_from_dict(cfg, GC_MODULES, **kwargs)
 
 
 def build_attention(cfg, **kwargs):
