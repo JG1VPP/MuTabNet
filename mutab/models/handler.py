@@ -1,11 +1,12 @@
 from collections import defaultdict
 from functools import cached_property
+from itertools import product
 from typing import Dict, List
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from more_itertools import split_at
+from more_itertools import flatten, split_at
 
 from mutab.models.factory import HANDLERS
 from mutab.models.revisor import Revisor
@@ -96,21 +97,18 @@ class TableHandler(nn.Module):
 
     def encode_cell(self, batch):
         samples = []
-        for string in batch:
-            seq = []
-            for idx in self.str2idx(string, self.char2idx_cell):
-                seq.extend(idx)
-                seq.append(self.SEP_CELL)
-            seq.insert(0, self.SOS_CELL)
-            seq.append(self.EOS_CELL)
-            samples.append(torch.tensor(seq))
+        sos = self.SOS_CELL
+        eos = self.EOS_CELL
+        sep = self.SEP_CELL
+        for sample in batch:
+            item = self.str2idx(sample, self.char2idx_cell)
+            item = flatten(flatten(product(item, [[sep]])))
+            samples.append(torch.tensor([sos, *item, eos]))
         return self.pad_tensor(samples, self.PAD_CELL)
 
     def decode_html(self, batch):
-        indices = []
-        for idx in batch.tolist():
-            indices.append(next(split_at(idx, lambda n: n == self.EOS_HTML)))
-        return self.idx2str(indices, self.idx2char_html)
+        strip = lambda it: next(split_at(it, lambda n: n == self.EOS_HTML))
+        return self.idx2str(map(strip, batch.tolist()), self.idx2char_html)
 
     def decode_cell(self, batch):
         strings = []
