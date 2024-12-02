@@ -24,34 +24,36 @@ class TableScanner(BaseModule):
     ):
         super().__init__()
 
-        # Label handler
+        # label handler
         assert handler is not None
         self.handler = factory.build_handler(handler)
 
-        # Backbone
+        # backbone
         assert backbone is not None
         self.backbone = factory.build_backbone(backbone)
 
-        # Encoder module
+        # encoder module
         assert encoder is not None
         self.encoder = factory.build_encoder(encoder)
 
-        # Decoder module
+        # decoder module
         assert decoder is not None
         decoder.update(num_emb_html=self.handler.num_class_html)
         decoder.update(num_emb_cell=self.handler.num_class_cell)
 
-        # special tokens
+        # special tokens (html)
         decoder.update(SOC_HTML=self.handler.SOC_HTML)
         decoder.update(SOS_HTML=self.handler.SOS_HTML)
         decoder.update(EOS_HTML=self.handler.EOS_HTML)
+
+        # special tokens (cell)
         decoder.update(SOS_CELL=self.handler.SOS_CELL)
         decoder.update(EOS_CELL=self.handler.EOS_CELL)
         decoder.update(SEP_CELL=self.handler.SEP_CELL)
 
         self.decoder = factory.build_decoder(decoder)
 
-        # Loss
+        # loss
         assert isinstance(html_loss, list) and len(html_loss)
         assert isinstance(cell_loss, list) and len(cell_loss)
 
@@ -110,8 +112,8 @@ class TableScanner(BaseModule):
 
     def forward_train(self, image, img_metas):
         targets = self.handler.forward(img_metas)
-        outputs = self.decoder(self.encoder(self.backbone(image)), targets=targets)
-        return ChainMap(*[loss(outputs, targets, img_metas) for loss in self.loss])
+        outputs = self.decoder(self.encoder(self.backbone(image)), **targets)
+        return ChainMap(*[f(outputs, targets, img_metas) for f in self.loss])
 
     def forward_test(self, images, img_metas):
         return self.simple_test(images, img_metas)

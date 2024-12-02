@@ -228,11 +228,11 @@ class TableDecoder(nn.Module):
         self.register_buffer("LtoR", torch.eye(2)[0])
         self.register_buffer("RtoL", torch.eye(2)[1])
 
-    def forward(self, img, targets):
+    def forward(self, img, html, back, cell, **kwargs):
         # ground truth
-        html = targets["html"].to(img.device)
-        back = targets["back"].to(img.device)
-        cell = targets["cell"].to(img.device)
+        html = html.to(img.device)
+        back = back.to(img.device)
+        cell = cell.to(img.device)
 
         # LtoR or RtoL
         LtoR = self.LtoR.expand(len(img), 1, 2)
