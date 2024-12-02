@@ -56,6 +56,18 @@ class TablePad:
 
 
 @PIPELINES.register_module()
+class TableBboxFlip:
+    def __call__(self, results):
+        h, _, _ = results["img_shape"]
+        bbox = results["img_info"].get("bbox", results.get("bbox"))
+        mask = np.count_nonzero(bbox, axis=-1, keepdims=True)
+        flip = np.where(mask, h - 1 - bbox, bbox).clip(min=0)
+        np.copyto(bbox[..., 1], flip[..., 1])
+        np.copyto(bbox[..., 3], flip[..., 3])
+        return results
+
+
+@PIPELINES.register_module()
 class TableBboxEncode:
     def __call__(self, results):
         info = results["img_info"]
