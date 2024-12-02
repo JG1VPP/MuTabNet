@@ -50,22 +50,34 @@ model = dict(
     decoder=dict(
         type="TableDecoder",
         html_decoder=dict(
-            type1="WindowAttention",
-            type2="GlobalAttention",
-            depth=3,
-            heads=8,
-            dropout=0.2,
-            window=300,
+            blocks=[
+                dict(
+                    att1=dict(type="WindowAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+                dict(
+                    att1=dict(type="WindowAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+                dict(
+                    att1=dict(type="WindowAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+            ],
         ),
         cell_decoder=dict(
-            type1="WindowAttention",
-            type2="GlobalAttention",
-            depth=1,
-            heads=8,
-            dropout=0.2,
-            window=300,
+            blocks=[
+                dict(
+                    att1=dict(type="WindowAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+            ],
         ),
+        html_fetcher={},
+        heads=8,
+        window=300,
         d_model=512,
+        dropout=0.2,
         max_len_html=max_len_html,
         max_len_cell=max_len_cell,
     ),
