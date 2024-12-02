@@ -72,7 +72,7 @@ model = dict(
     html_loss=[
         dict(type="CELoss", key="html"),
         dict(type="CELoss", key="back"),
-        dict(type="KLLoss"),
+        dict(type="KLLoss", key="html", rev="back"),
         dict(type="BBLoss"),
     ],
     cell_loss=[
