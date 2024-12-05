@@ -6,8 +6,8 @@ from typing import List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from local_attention import LocalAttention
 from positional_encodings import torch_encodings as pos
+from rotary_embedding_torch import RotaryEmbedding
 
 from mutab.models.factory import ATTENTIONS, DECODERS, build_attention
 
@@ -56,29 +56,6 @@ class Attention(nn.Module, abc.ABC):
 
 
 @ATTENTIONS.register_module()
-class WindowAttention(Attention):
-    def __init__(self, dropout: float, window: int, **kwargs):
-        super().__init__(**kwargs)
-        self.local_att = LocalAttention(
-            dim=self.dim,
-            window_size=window,
-            causal=self.causal,
-            look_forward=0,
-            look_backward=1,
-            dropout=dropout,
-            autopad=True,
-            exact_windowsize=False,
-        )
-
-    @property
-    def causal(self):
-        return True
-
-    def attention(self, q, k, v, **kwargs):
-        return self.local_att(q, k, v, **kwargs)
-
-
-@ATTENTIONS.register_module()
 class GlobalAttention(Attention):
     def __init__(self, dropout: float, **kwargs):
         super().__init__(**kwargs)
@@ -93,6 +70,52 @@ class GlobalAttention(Attention):
         p = q.matmul(k.mT.div(math.sqrt(v.size(-1))))
         p = p if mask is None else self.mask(p, mask)
         return self.drop(p.softmax(dim=-1)).matmul(v)
+
+
+@ATTENTIONS.register_module()
+class WindowAttention(GlobalAttention):
+    def __init__(self, window: int, **kwargs):
+        super().__init__(**kwargs)
+        self.rotary = RotaryEmbedding(self.dim)
+        self.window = window
+
+    @property
+    def causal(self):
+        return True
+
+    def attention(self, q, k, v, **kwargs):
+        # buckets
+        bq = self.bucket(q)
+        bk = self.unfold(self.bucket(k))
+        bv = self.unfold(self.bucket(v))
+
+        # indices
+        n = int(bq.shape[-3:-1].numel())
+        i = torch.arange(n).to(q.device)
+        i = self.bucket(i.unsqueeze(-1))
+        j = self.unfold(i).mT
+
+        # masking
+        mask = i.ge(j).logical_and(j.ne(-1))
+
+        # rotary embedding
+        bq = self.rotary.rotate_queries_or_keys(bq)
+        bk = self.rotary.rotate_queries_or_keys(bk)
+
+        # global attention
+        out = super().attention(q=bq, k=bk, v=bv, mask=mask)
+        return out.flatten(-3, -2).narrow(-2, 0, q.size(-2))
+
+    def bucket(self, x):
+        n = self.window * math.ceil(x.size(-2) / self.window)
+        x = F.pad(x, pad=(0, 0, 0, n - x.size(-2)), value=-1)
+        x = torch.stack(x.split(self.window, dim=-2), dim=-3)
+        return x
+
+    def unfold(self, x):
+        pad = F.pad(x, pad=(0, 0, 0, 0, 1, 0), value=-1)
+        pad = pad.narrow(-3, start=0, length=x.size(-3))
+        return torch.cat([pad, x], dim=-2)
 
 
 @ATTENTIONS.register_module()

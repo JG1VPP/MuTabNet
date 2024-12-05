@@ -4,7 +4,6 @@ version = "0.1.0"
 dependencies = [
   "apted",
   "distance",
-  "local_attention",
   "lxml",
   "mmcv-full<2",
   "mmdet<3",
@@ -13,6 +12,7 @@ dependencies = [
   "numpy",
   "positional-encodings[pytorch]",
   "ranger@git+https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer",
+  "rotary-embedding-torch",
   "torch>=2,<2.1",
   "tqdm",
   "urllib3<2",
