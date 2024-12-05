@@ -1,10 +1,11 @@
-from typing import Any, Mapping
+from typing import Any, List, Mapping
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mutab.models.factory import BACKBONES
+from mutab.models.factory import BACKBONES, GC_MODULES
+from mutab.models.factory import build_gc_module as build
 
 
 class BN(nn.BatchNorm2d):
@@ -27,7 +28,8 @@ class ConvBnReLU(nn.Sequential):
         super().__init__(ConvBn(d, h, k, mom=mom), nn.ReLU())
 
 
-class Attention(nn.Module):
+@GC_MODULES.register_module()
+class GCA(nn.Module):
     def __init__(self, d: int, ratio: float, heads: int):
         super().__init__()
         neck = int(ratio * d)
@@ -49,15 +51,17 @@ class Attention(nn.Module):
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, d: int, h: int, gc=False, **gcb):
+    def __init__(self, d: int, h: int, gca: List[str] = [], **gcb):
         super().__init__()
-        self.cv1 = ConvBn(d, h, 3, mom=0.9)
-        self.cv2 = ConvBn(h, h, 3, mom=0.9)
-        self.att = Attention(h, **gcb) if gc else nn.Identity()
-        self.cv3 = ConvBn(d, h, 1) if d != h else nn.Identity()
+        self.cv1 = nn.Sequential()
+        self.cv1.append(ConvBn(d, h, 3, mom=0.9))
+        self.cv1.append(nn.ReLU())
+        self.cv1.append(ConvBn(h, h, 3, mom=0.9))
+        self.cv1.extend(build(gcb, type=gc, d=h) for gc in gca)
+        self.cv2 = ConvBn(d, h, 1) if d != h else nn.Identity()
 
     def forward(self, x):
-        return F.relu(self.cv3(x).add(self.att(self.cv2(F.relu(self.cv1(x))))))
+        return F.relu(self.cv2(x).add(self.cv1(x)))
 
 
 class ResidualGroup(nn.Sequential):
