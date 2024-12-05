@@ -1,6 +1,6 @@
 import abc
 import math
-from operator import itemgetter
+from functools import partial
 from typing import List
 
 import torch
@@ -17,40 +17,41 @@ class PositionalEncodingAdd(pos.PositionalEncoding1D):
         return super().forward(x).add(x)
 
 
+class Mask(nn.Module):
+    def forward(self, x, mask):
+        return x.where(mask, torch.finfo(x.dtype).min)
+
+
 class Linear(nn.Sequential):
-    def __init__(self, d: int, h: int, act=nn.Identity):
+    def __init__(self, d: int, h: int, *, act=nn.Identity):
         super().__init__(nn.LayerNorm(d), nn.Linear(d, h), act())
-
-
-class Linears(nn.Sequential):
-    def __init__(self, d: int, h: int, act=nn.ReLU):
-        super().__init__(Linear(d, d, act), Linear(d, h))
 
 
 class Attention(nn.Module, abc.ABC):
     def __init__(self, heads: int, d_model: int, **kwargs):
         super().__init__()
         assert d_model % heads == 0
-        self.dim = int(d_model / heads)
-        self.size = heads, self.dim
-        self.fc_q = Linear(d_model, d_model)
-        self.fc_k = Linear(d_model, d_model)
-        self.fc_v = Linear(d_model, d_model)
-        self.fc_x = Linear(d_model, d_model)
+        self.dim = int(d_model // heads)
+        self.lhd = (-1, heads, self.dim)
+        self.q = Linear(d_model, d_model)
+        self.k = Linear(d_model, d_model)
+        self.v = Linear(d_model, d_model)
+        self.w = Linear(d_model, d_model)
 
-    def forward(self, q, k, v, mask=None):
-        q = self.fc_q(q).view(len(q), -1, *self.size).swapaxes(1, 2)
-        k = self.fc_k(k).view(len(k), -1, *self.size).swapaxes(1, 2)
-        v = self.fc_v(v).view(len(v), -1, *self.size).swapaxes(1, 2)
-        x = self.attention(q, k, v, mask=mask).swapaxes(1, 2)
-        return self.fc_x(x.contiguous().flatten(start_dim=2))
+    def forward(self, q, k, v, **kwargs):
+        q = self.q(q).view(len(q), *self.lhd).transpose(1, 2)
+        k = self.k(k).view(len(k), *self.lhd).transpose(1, 2)
+        v = self.v(v).view(len(v), *self.lhd).transpose(1, 2)
+        x = self.attention(q, k, v, **kwargs).transpose(1, 2)
+        return self.w(x.contiguous().flatten(start_dim=2))
 
+    @property
     @abc.abstractmethod
-    def attention(self, q, k, v, mask):
+    def causal(self) -> bool:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def causality(self, ksize: int):
+    def attention(self, q, k, v, **kwargs):
         raise NotImplementedError
 
 
@@ -61,7 +62,7 @@ class WindowAttention(Attention):
         self.local_att = LocalAttention(
             dim=self.dim,
             window_size=window,
-            causal=True,
+            causal=self.causal,
             look_forward=0,
             look_backward=1,
             dropout=dropout,
@@ -69,55 +70,106 @@ class WindowAttention(Attention):
             exact_windowsize=False,
         )
 
-    def attention(self, q, k, v, mask):
-        return self.local_att(q, k, v, mask=mask)
+    @property
+    def causal(self):
+        return True
 
-    def causality(self, ksize: int):
-        return None
+    def attention(self, q, k, v, **kwargs):
+        return self.local_att(q, k, v, **kwargs)
 
 
 @ATTENTIONS.register_module()
 class GlobalAttention(Attention):
     def __init__(self, dropout: float, **kwargs):
         super().__init__(**kwargs)
-        self.dropout = nn.Dropout(dropout)
+        self.drop = nn.Dropout(dropout)
+        self.mask = Mask()
 
-    def attention(self, q, k, v, mask):
-        prob = torch.matmul(q, k.swapaxes(-2, -1) / math.sqrt(v.shape[-1]))
-        mask = torch.ones_like(prob) if mask is None else mask.to(q.device)
-        prob = prob.masked_fill(mask.logical_not(), torch.finfo(q.dtype).min)
-        return self.dropout(prob.softmax(dim=-1)).matmul(v).reshape(*q.shape)
+    @property
+    def causal(self):
+        return False
 
-    def causality(self, ksize: int):
-        return torch.ones(ksize, ksize).tril_().expand(1, 1, ksize, ksize)
+    def attention(self, q, k, v, mask=None, **kwargs):
+        p = q.matmul(k.mT.div(math.sqrt(v.size(-1))))
+        p = p if mask is None else self.mask(p, mask)
+        return self.drop(p.softmax(dim=-1)).matmul(v)
+
+
+@ATTENTIONS.register_module()
+class AbsentAttention(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    def forward(self, q, k, v, **kwargs):
+        return torch.zeros_like(q)
+
+
+class FeedForward(nn.Sequential):
+    def __init__(self, d_model: int, **kwargs):
+        super().__init__()
+        self.append(Linear(d_model, d_model, act=nn.ReLU))
+        self.append(Linear(d_model, d_model, act=nn.Identity))
 
 
 class Block(nn.Module):
-    def __init__(self, type1, type2, d_model: int, **kwargs):
+    def __init__(self, att1, att2, **kwargs):
         super().__init__()
-        self.att1 = build_attention(kwargs, type=type1, d_model=d_model)
-        self.att2 = build_attention(kwargs, type=type2, d_model=d_model)
-        self.norm = Linears(d_model, d_model)
+        self.att1 = build_attention(att1, **kwargs)
+        self.att2 = build_attention(att2, **kwargs)
+        self.feed = FeedForward(**kwargs)
 
-    def forward(self, features):
-        x, y = itemgetter("x", "y")(features)
-        mask = self.att1.causality(x.size(1))
-        x = x + self.att1(x, x, x, mask=mask)
-        x = x + self.att2(x, y, y)
-        x = x + self.norm(x)
-        return dict(x=x, y=y)
+    def forward(self, kwargs):
+        kwargs.update(**self.perform(**kwargs))
+        return kwargs
+
+    def perform(self, x, y, mask=None, **kwargs):
+        x = x.add(self.att1(x, x, x, mask=mask))
+        x = x.add(self.att2(x, y, y, mask=None))
+        x = x.add(self.feed(x))
+        return dict(x=x)
 
 
 class Blocks(nn.Sequential):
-    def __init__(self, depth: int, **decoder):
-        block = lambda n: Block(index=n, **decoder)
-        super().__init__(*map(block, range(depth)))
+    def __init__(self, blocks, **kwargs):
+        block = lambda args: Block(**args, **kwargs)
+        super().__init__(*tuple(map(block, blocks)))
+
+    def forward(self, **kwargs):
+        return super().forward(kwargs).get("x")
+
+
+class Fetcher(nn.Module):
+    def __init__(self, SOC: int, EOS: int, **kwargs):
+        super().__init__()
+
+        # special tokens
+        self.register_buffer("SOC", torch.tensor(SOC))
+        self.register_buffer("EOS", torch.tensor(EOS))
+
+    def extract(self, x, mask, size):
+        return F.pad(x[mask], pad=(0, 0, 0, size - sum(mask)))
+
+    def forward(self, img, hid, seq):
+        assert hid.ndim == 3
+        assert seq.ndim == 2
+
+        # masking
+        soc = torch.isin(seq, self.SOC).unsqueeze(2)
+        eos = torch.isin(seq, self.EOS).unsqueeze(2)
+
+        # padding
+        soc = soc.logical_and(eos.cumsum(dim=1).logical_not())
+        pad = partial(self.extract, size=soc.sum(dim=1).max())
+
+        # extract
+        ext = torch.stack(list(map(pad, hid, soc.squeeze(2))))
+
+        return hid, ext
 
 
 class Decoder(nn.Module):
     def __init__(
         self,
-        depth: int,
         d_input: int,
         d_model: int,
         num_emb: int,
@@ -125,7 +177,7 @@ class Decoder(nn.Module):
         SOS: int,
         EOS: int,
         SEP: int,
-        **decoder,
+        **kwargs,
     ):
         super().__init__()
 
@@ -139,7 +191,7 @@ class Decoder(nn.Module):
         self.pos = PositionalEncodingAdd(d_model)
 
         # blocks
-        self.dec = Blocks(depth, d_model=d_model, **decoder)
+        self.dec = Blocks(d_model=d_model, **kwargs)
         self.cat = Linear(d_input, d_model)
         self.out = Linear(d_model, num_emb)
 
@@ -166,8 +218,8 @@ class Decoder(nn.Module):
         mix = torch.cat([self.emb(seq), mat.matmul(aux)], dim=-1)
 
         # prediction
-        hid = self.dec(dict(x=self.pos(self.cat(mix)), y=img)).get("x")
-        out = self.out(hid).argmax(dim=-1) if argmax else self.out(hid)
+        hid = self.dec(x=self.pos(self.cat(mix)), y=img, mask=None)
+        out = self.out(hid).argmax(-1) if argmax else self.out(hid)
 
         return hid, out
 
@@ -179,6 +231,7 @@ class TableDecoder(nn.Module):
         d_model: int,
         html_decoder,
         cell_decoder,
+        html_fetcher,
         num_emb_html: int,
         num_emb_cell: int,
         max_len_html: int,
@@ -214,15 +267,24 @@ class TableDecoder(nn.Module):
         cell_decoder.update(EOS=EOS_CELL)
         cell_decoder.update(SEP=SEP_CELL)
 
+        html_fetcher.update(SOC=SOC_HTML)
+        html_fetcher.update(EOS=EOS_HTML)
+
+        # input channels
+        html_decoder.update(d_input=d_model + 2)
+        cell_decoder.update(d_input=d_model * 2)
+
+        # other parameters
+        html_decoder.update(**kwargs)
+        cell_decoder.update(**kwargs)
+
         # en/decoders
-        self.html = Decoder(d_input=d_model + 2, **html_decoder)
-        self.cell = Decoder(d_input=d_model * 2, **cell_decoder)
+        self.html = Decoder(**html_decoder)
+        self.cell = Decoder(**cell_decoder)
+        self.grid = Fetcher(**html_fetcher)
 
         # bbox
-        self.bbox = Linear(d_model, 4, nn.Sigmoid)
-
-        # mask
-        self.register_buffer("SOC_HTML", torch.tensor(SOC_HTML))
+        self.bbox = Linear(d_model, 4, act=nn.Sigmoid)
 
         # LtoR or RtoL
         self.register_buffer("LtoR", torch.eye(2)[0])
@@ -234,38 +296,42 @@ class TableDecoder(nn.Module):
         back = back.to(img.device)
         cell = cell.to(img.device)
 
+        # remove [EOS]
+        s_html = html[:, :-1]
+        e_back = back[:, :-1]
+        s_cell = cell[:, :-1]
+
+        # remove [SOS]
+        e_html = html[:, 1::]
+
         # LtoR or RtoL
-        LtoR = self.LtoR.expand(len(img), 1, 2)
-        RtoL = self.RtoL.expand(len(img), 1, 2)
+        h_LtoR = self.LtoR.expand(len(img), 1, 2)
+        h_RtoL = self.RtoL.expand(len(img), 1, 2)
 
         # structure prediction
-        html_hid, html_out = self.html(img, html[:, :-1], LtoR)
-        back_hid, back_out = self.html(img, back[:, :-1], RtoL)
-
-        # <TD></TD> extraction
-        grid = self.grid(html_hid, html[:, 1:])
+        h_html, o_html = self.html(img, s_html, h_LtoR)
+        h_back, o_back = self.html(img, e_back, h_RtoL)
 
         # character prediction
-        cell_hid, cell_out = self.cell(img, cell[:, :-1], grid)
+        h_html, h_grid = self.grid(img, h_html, e_html)
+        h_cell, o_cell = self.cell(img, s_cell, h_grid)
 
         return dict(
-            html=html_out,
-            back=back_out,
-            cell=cell_out,
-            bbox=self.bbox(html_hid),
+            html=o_html,
+            back=o_back,
+            cell=o_cell,
+            bbox=self.bbox(h_html),
         )
 
     def predict(self, img):
         # LtoR
-        LtoR = self.LtoR.expand(len(img), 1, 2)
+        h_LtoR = self.LtoR.expand(len(img), 1, 2)
 
         # structure prediction
-        html_hid, html_out = self.html.predict(img, LtoR)
+        h_html, o_html = self.html.predict(img, h_LtoR)
 
-        # cell bbox prediction
-        _, cell_out = self.cell.predict(img, self.grid(html_hid, html_out))
-        return dict(html=html_out, cell=cell_out, bbox=self.bbox(html_hid))
+        # character prediction
+        h_html, h_grid = self.grid(img, h_html, o_html)
+        h_cell, o_cell = self.cell.predict(img, h_grid)
 
-    def grid(self, x, text):
-        pad = lambda x, mask: F.pad(x[mask], (0, 0, 0, len(x) - len(x[mask])))
-        return torch.stack(list(map(pad, x, torch.isin(text, self.SOC_HTML))))
+        return dict(html=o_html, cell=o_cell, bbox=self.bbox(h_html))
