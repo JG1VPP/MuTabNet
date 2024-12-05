@@ -33,8 +33,16 @@ class CELoss(nn.Module):
 
 @LOSSES.register_module()
 class KLLoss(nn.Module):
-    def __init__(self, ignore_index: int):
+    def __init__(self, key: str, rev: str, ignore_index: int):
         super().__init__()
+
+        # keys
+        self.key = key
+        self.rev = rev
+
+        # labels
+        self.loss_key = f"loss_kl_{key}"
+        self.loss_rev = f"loss_kl_{rev}"
 
         # prob
         self.sm_p = nn.Softmax(dim=2)
@@ -51,13 +59,13 @@ class KLLoss(nn.Module):
         return nn.KLDivLoss(reduction=reduction)
 
     def format(self, outputs, targets):
-        # align
-        logit_f = outputs["html"][:, :-1]
-        logit_b = outputs["back"][:, :-1].fliplr()
+        # outputs [N, L, C]
+        logit_f = outputs[self.key][:, :-1]
+        logit_b = outputs[self.rev][:, :-1].fliplr()
 
         # detect <PAD>
-        html = targets["html"][:, 1:-1].unsqueeze(-1)
-        mask = ~torch.eq(html.to(self.PAD), self.PAD)
+        text = targets[self.key][:, 1:-1].unsqueeze(-1)
+        mask = ~torch.isin(text.to(self.PAD), self.PAD)
 
         # P: target
         p_f = self.sm_p(logit_b.mul(mask)).detach()
@@ -73,7 +81,7 @@ class KLLoss(nn.Module):
         qp_f, qp_b, mask = self.format(outputs, targets)
         kl_f = self.loss(*qp_f).div(mask.sum().clamp(1))
         kl_b = self.loss(*qp_b).div(mask.sum().clamp(1))
-        return dict(loss_kl_html=kl_f, loss_kl_back=kl_b)
+        return {self.loss_key: kl_f, self.loss_rev: kl_b}
 
 
 @LOSSES.register_module()
