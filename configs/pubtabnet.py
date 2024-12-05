@@ -91,8 +91,6 @@ model = dict(
     ),
 )
 
-img_norm_cfg = dict(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-
 train_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(type="TableResize", size=520),
@@ -102,7 +100,11 @@ train_pipeline = [
     ),
     dict(type="TableBboxEncode"),
     dict(type="ToTensorOCR"),
-    dict(type="NormalizeOCR", **img_norm_cfg),
+    dict(
+        type="NormalizeOCR",
+        mean=[0.5, 0.5, 0.5],
+        std=[0.5, 0.5, 0.5],
+    ),
     dict(
         type="Collect",
         keys=["img"],
@@ -127,7 +129,11 @@ test_pipeline = [
         size=(520, 520),
     ),
     dict(type="ToTensorOCR"),
-    dict(type="NormalizeOCR", **img_norm_cfg),
+    dict(
+        type="NormalizeOCR",
+        mean=[0.5, 0.5, 0.5],
+        std=[0.5, 0.5, 0.5],
+    ),
     dict(
         type="Collect",
         keys=["img"],
