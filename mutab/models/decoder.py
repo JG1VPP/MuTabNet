@@ -12,11 +12,6 @@ from rotary_embedding_torch import RotaryEmbedding
 from mutab.models.factory import ATTENTIONS, DECODERS, build_attention
 
 
-class PositionalEncodingAdd(pos.PositionalEncoding1D):
-    def forward(self, x):
-        return super().forward(x).add(x)
-
-
 class Mask(nn.Module):
     def forward(self, x, mask):
         return x.where(mask, torch.finfo(x.dtype).min)
@@ -83,7 +78,7 @@ class WindowAttention(GlobalAttention):
     def causal(self):
         return True
 
-    def attention(self, q, k, v, **kwargs):
+    def attention(self, q, k, v, cell=None, **kwargs):
         # buckets
         bq = self.bucket(q)
         bk = self.unfold(self.bucket(k))
@@ -95,8 +90,13 @@ class WindowAttention(GlobalAttention):
         i = self.bucket(i.unsqueeze(-1))
         j = self.unfold(i).mT
 
+        # regions
+        req = self.bucket(cell)
+        rek = self.unfold(req).mT
+
         # masking
         mask = i.ge(j).logical_and(j.ne(-1))
+        mask = mask.logical_and(req.eq(rek))
 
         # rotary embedding
         bq = self.rotary.rotate_queries_or_keys(bq)
@@ -145,9 +145,9 @@ class Block(nn.Module):
         kwargs.update(**self.perform(**kwargs))
         return kwargs
 
-    def perform(self, x, y, mask=None, **kwargs):
-        x = x.add(self.att1(x, x, x, mask=mask))
-        x = x.add(self.att2(x, y, y, mask=None))
+    def perform(self, x, y, cell=None, mask=None, **kwargs):
+        x = x.add(self.att1(x, x, x, cell=cell, mask=mask))
+        x = x.add(self.att2(x, y, y, cell=None, mask=None))
         x = x.add(self.feed(x))
         return dict(x=x)
 
@@ -210,8 +210,8 @@ class Decoder(nn.Module):
         self.register_buffer("SEP", torch.tensor(SEP))
 
         # embedding
-        self.emb = nn.Embedding(num_emb, d_model)
-        self.pos = PositionalEncodingAdd(d_model)
+        self.emb = nn.Embedding(num_emb, d_model, max_norm=1)
+        self.pos = pos.PositionalEncoding1D(channels=d_model)
 
         # blocks
         self.dec = Blocks(d_model=d_model, **kwargs)
@@ -225,24 +225,42 @@ class Decoder(nn.Module):
         seq = self.SOS.expand(len(img), 1)
         eos = self.EOS.expand(len(img), 1)
         for _ in range(self.max_len + 1):
-            h, out = self(img, seq, aux, argmax=True)
+            hid, out = self(img, seq, aux, best=True)
             seq = torch.cat([seq[:, :1], out], dim=1)
             end = seq.eq(eos).sum(dim=1).bool().sum()
             if end.item() == len(img):
                 break
 
-        return h, out
+        return hid, out
 
-    def forward(self, img, seq, aux, argmax=False):
-        # alignment
-        idx = torch.eq(seq, self.SEP).cumsum(dim=1).unsqueeze(-1)
-        mat = torch.zeros(*seq.shape, aux.size(1)).to(aux.device)
-        mat = mat.scatter_(-1, idx.clip_(max=aux.size(1) - 1), 1)
-        mix = torch.cat([self.emb(seq), mat.matmul(aux)], dim=-1)
+    def forward(self, img, seq, aux, best=False):
+        assert seq.ndim == 2
+        assert aux.ndim == 3
+
+        # max index of [SEP] token
+        mux = int(aux.size(1) - 1)
+
+        # detect token occurrences
+        sep = seq.eq(self.SEP).unsqueeze(2)
+
+        # indices inside each cell
+        pos = torch.ones_like(sep).cumsum(dim=1).sub_(1)
+        pos = pos.sub(pos.mul(sep).cummax(dim=1).values)
+
+        # identify important cells
+        idx = sep.cumsum(dim=1).clip(max=mux)
+
+        # assign features to cells
+        mat = torch.zeros(*seq.shape, mux + 1).to(aux)
+        mat.scatter_(dim=seq.ndim, index=idx, value=1)
+
+        # with positional encoding
+        mix = self.cat(torch.dstack([self.emb(seq), mat.bmm(aux)]))
+        pos = self.pos(mix).gather(dim=1, index=pos.expand_as(mix))
 
         # prediction
-        hid = self.dec(x=self.pos(self.cat(mix)), y=img, mask=None)
-        out = self.out(hid).argmax(-1) if argmax else self.out(hid)
+        hid = self.dec(x=mix.add(pos), y=img, cell=idx.unsqueeze(1))
+        out = self.out(hid).argmax(dim=2) if best else self.out(hid)
 
         return hid, out
 
