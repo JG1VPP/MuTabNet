@@ -169,6 +169,9 @@ class Fetcher(nn.Module):
         self.register_buffer("SOC", torch.tensor(SOC))
         self.register_buffer("EOS", torch.tensor(EOS))
 
+        # blocks
+        self.md = Blocks(**kwargs)
+
     def extract(self, x, mask, size):
         return F.pad(x[mask], pad=(0, 0, 0, size - sum(mask)))
 
@@ -186,6 +189,11 @@ class Fetcher(nn.Module):
 
         # extract
         ext = torch.stack(list(map(pad, hid, soc.squeeze(2))))
+        run = torch.stack(list(map(pad, soc, soc.squeeze(2))))
+
+        # forward
+        ext = self.md(x=ext, y=img, mask=run.unsqueeze(1).mT)
+        hid = hid.masked_scatter(soc, ext.masked_select(run))
 
         return hid, ext
 
@@ -290,6 +298,7 @@ class TableDecoder(nn.Module):
         # parameters
         html_decoder.update(d_model=d_model)
         cell_decoder.update(d_model=d_model)
+        html_fetcher.update(d_model=d_model)
 
         # alphabet
         html_decoder.update(num_emb=num_emb_html)
@@ -318,6 +327,7 @@ class TableDecoder(nn.Module):
         # other parameters
         html_decoder.update(**kwargs)
         cell_decoder.update(**kwargs)
+        html_fetcher.update(**kwargs)
 
         # en/decoders
         self.html = Decoder(**html_decoder)

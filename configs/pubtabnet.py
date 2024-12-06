@@ -73,7 +73,14 @@ model = dict(
                 ),
             ],
         ),
-        html_fetcher={},
+        html_fetcher=dict(
+            blocks=[
+                dict(
+                    att1=dict(type="GlobalAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+            ],
+        ),
         heads=8,
         window=300,
         d_model=512,
