@@ -229,18 +229,6 @@ class Decoder(nn.Module):
         # prediction length
         self.max_len = max_len
 
-    def predict(self, img, aux):
-        seq = self.SOS.expand(len(img), 1)
-        eos = self.EOS.expand(len(img), 1)
-        for _ in range(self.max_len + 1):
-            hid, out = self(img, seq, aux, best=True)
-            seq = torch.cat([seq[:, :1], out], dim=1)
-            end = seq.eq(eos).sum(dim=1).bool().sum()
-            if end.item() == len(img):
-                break
-
-        return hid, out
-
     def forward(self, img, seq, aux, best=False):
         assert seq.ndim == 2
         assert aux.ndim == 3
@@ -271,6 +259,56 @@ class Decoder(nn.Module):
         out = self.out(hid).argmax(dim=2) if best else self.out(hid)
 
         return hid, out
+
+    def predict(self, img, aux):
+        yet = True
+
+        # initial batch
+        sep = aux.any(dim=2)
+        sos = self.SOS.expand(len(aux), 1)
+        eos = self.EOS.expand(len(aux), 1)
+        sep = self.SEP.where(sep, self.EOS)
+        seq = torch.hstack([sos, sep, eos])
+
+        # sequential inference
+        while yet and seq.size(1) <= self.max_len:
+            seq, yet = self.enlarge(img, seq, aux)
+
+        return self(img, seq, aux, best=True)
+
+    def enlarge(self, img, seq, aux):
+        hid, out = self(img, seq, aux, best=True)
+
+        # detect new tokens
+        mask = seq.roll(-1, 1).eq(self.SEP)
+        mask.logical_and_(out.ne(self.SEP))
+        mask.logical_and_(out.ne(self.EOS).cumprod(dim=1))
+        mask.logical_and_(seq.ne(self.EOS).cumprod(dim=1))
+
+        # remove old tokens
+        out.mul_(mask.to(out))
+
+        # aggregate inserts
+        old = F.pad(mask, pad=(1, 0)).cumsum(dim=1)[:, :-1]
+        new = F.pad(mask, pad=(0, 1)).cumsum(dim=1)[:, :-1]
+
+        # calculate indices
+        old.add_(torch.arange(old.size(1)).to(seq))
+        new.add_(torch.arange(new.size(1)).to(seq))
+
+        # allocate sequence
+        ret = mask.cumsum(dim=1).max().add(old.size(1))
+        ret = torch.zeros(len(seq), ret.item()).to(seq)
+
+        # limit index range
+        old.clip_(max=ret.size(1) - 1)
+        new.clip_(max=ret.size(1) - 1)
+
+        # combine sequences
+        ret.scatter_add_(dim=1, index=old, src=seq)
+        ret.scatter_add_(dim=1, index=new, src=out)
+
+        return ret, mask.any().item()
 
 
 @DECODERS.register_module()
