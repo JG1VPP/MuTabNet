@@ -311,6 +311,21 @@ class Decoder(nn.Module):
         return ret, mask.any().item()
 
 
+class Locator(nn.Module):
+    def __init__(self, d_model: int, pass_html: bool):
+        super().__init__()
+        self.pos = Linear(d_model, 4, act=nn.Sigmoid)
+        self.emb = Linear(4, d_model, act=nn.Sigmoid)
+        self.pass_html = int(pass_html)
+
+    def forward(self, img, html, grid):
+        plus = self.emb(self.pos(grid))
+        grid = grid.mul(self.pass_html)
+        grid = grid.add(plus)
+        bbox = self.pos(html)
+        return grid, bbox
+
+
 @DECODERS.register_module()
 class TableDecoder(nn.Module):
     def __init__(
@@ -319,6 +334,7 @@ class TableDecoder(nn.Module):
         html_decoder,
         cell_decoder,
         html_fetcher,
+        bbox_locator,
         num_emb_html: int,
         num_emb_cell: int,
         max_len_html: int,
@@ -337,6 +353,7 @@ class TableDecoder(nn.Module):
         html_decoder.update(d_model=d_model)
         cell_decoder.update(d_model=d_model)
         html_fetcher.update(d_model=d_model)
+        bbox_locator.update(d_model=d_model)
 
         # alphabet
         html_decoder.update(num_emb=num_emb_html)
@@ -371,9 +388,7 @@ class TableDecoder(nn.Module):
         self.html = Decoder(**html_decoder)
         self.cell = Decoder(**cell_decoder)
         self.grid = Fetcher(**html_fetcher)
-
-        # bbox
-        self.bbox = Linear(d_model, 4, act=nn.Sigmoid)
+        self.bbox = Locator(**bbox_locator)
 
         # LtoR or RtoL
         self.register_buffer("LtoR", torch.eye(2)[0])
@@ -401,15 +416,18 @@ class TableDecoder(nn.Module):
         h_html, o_html = self.html(img, s_html, h_LtoR)
         h_back, o_back = self.html(img, e_back, h_RtoL)
 
-        # character prediction
+        # structure refinement
         h_html, h_grid = self.grid(img, h_html, e_html)
+        h_grid, o_bbox = self.bbox(img, h_html, h_grid)
+
+        # character prediction
         h_cell, o_cell = self.cell(img, s_cell, h_grid)
 
         return dict(
             html=o_html,
             back=o_back,
             cell=o_cell,
-            bbox=self.bbox(h_html),
+            bbox=o_bbox,
         )
 
     def predict(self, img):
@@ -419,8 +437,11 @@ class TableDecoder(nn.Module):
         # structure prediction
         h_html, o_html = self.html.predict(img, h_LtoR)
 
-        # character prediction
+        # structure refinement
         h_html, h_grid = self.grid(img, h_html, o_html)
+        h_grid, o_bbox = self.bbox(img, h_html, h_grid)
+
+        # character prediction
         h_cell, o_cell = self.cell.predict(img, h_grid)
 
-        return dict(html=o_html, cell=o_cell, bbox=self.bbox(h_html))
+        return dict(html=o_html, cell=o_cell, bbox=o_bbox)

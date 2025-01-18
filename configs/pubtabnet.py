@@ -81,6 +81,7 @@ model = dict(
                 ),
             ],
         ),
+        bbox_locator=dict(pass_html=True),
         heads=8,
         window=300,
         d_model=512,
