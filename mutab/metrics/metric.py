@@ -84,14 +84,18 @@ class TEDS:
                 self.load_html_tree(n, sub)
         return sub
 
+    def extract_table(self, text: str, parser):
+        tree = html.fromstring(text, parser=parser)
+        if not len(tables := tree.xpath("//table")):
+            text = "<table>{}</table>".format(text)
+            return self.extract_table(text, parser)
+        else:
+            return next(iter(tables))
+
     def evaluate(self, pred, real, **kwargs):
         parser = html.HTMLParser(remove_comments=True, encoding="utf-8")
-        pred = html.fromstring(pred, parser=parser)
-        real = html.fromstring(real, parser=parser)
-        pred = next(iter(pred.xpath("//table")), pred)
-        real = next(iter(real.xpath("//table")), real)
-        assert pred.tag in ("div", "table")
-        assert real.tag in ("div", "table")
+        pred = self.extract_table(pred, parser=parser)
+        real = self.extract_table(real, parser=parser)
         if self.ignore_tags:
             etree.strip_tags(pred, *self.ignore_tags)
             etree.strip_tags(real, *self.ignore_tags)

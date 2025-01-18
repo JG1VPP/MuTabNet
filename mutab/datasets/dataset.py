@@ -9,12 +9,11 @@ from mutab.utils import get_logger
 @DATASETS.register_module()
 class TableDataset(BaseDataset):
     def evaluate(self, results, **kwargs):
-        metric = TEDS(struct_only=False)
         scores = []
         logger = get_logger()
-        for idx, info in enumerate(self.data_infos):
-            score = metric.evaluate(**results[idx])
-            logger.info("%s score: %s", info["filename"], score)
+        for idx, table in enumerate(self.data_infos):
+            score = TEDS(struct_only=False).evaluate(**results[idx])
+            logger.info("TEDS: %.3f (%s)", score, table["filename"])
             scores.append(score)
 
         return dict(TEDS=np.mean(scores))
