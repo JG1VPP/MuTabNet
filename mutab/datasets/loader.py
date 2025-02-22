@@ -1,5 +1,4 @@
-import glob
-import os
+from pathlib import Path
 
 import numpy as np
 from mmocr.datasets.builder import LOADERS, PARSERS, build_parser
@@ -53,7 +52,7 @@ class TableHardDiskLoader:
         data = []
         logger = get_logger()
         logger.info(f"Loading {ann_file} ...")
-        for f in glob.glob(os.path.join(ann_file, "*.txt")):
+        for f in Path(ann_file).rglob("*.txt"):
             with open(f) as f:
                 data.append(self.parse(f))
         logger.info(f"{len(data)} tables were loaded from {ann_file}")

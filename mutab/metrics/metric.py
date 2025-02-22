@@ -12,21 +12,6 @@ class TableTree(Tree):
         self.row = row
         self.txt = txt
 
-    def bracket(self):
-        if self.tag == "td":
-            values = dict(
-                tag=self.tag,
-                col=self.col,
-                row=self.row,
-                txt=self.txt,
-            )
-        else:
-            values = dict(tag=self.tag)
-        result = str(values)
-        for child in self.children:
-            result += child.bracket()
-        return "{{{}}}".format(result)
-
 
 class Custom(Config):
     @staticmethod

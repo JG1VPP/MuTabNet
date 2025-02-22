@@ -11,10 +11,8 @@ from pathlib import Path
 import numpy as np
 from more_itertools import divide
 from torch.multiprocessing import set_start_method
-from tqdm import tqdm
 
 from mutab.apis import evaluate
-from mutab.utils import visualize_bbox
 
 EASY = "simple"
 HARD = "complex"
@@ -23,7 +21,6 @@ HARD = "complex"
 def main():
     args = argparse.ArgumentParser()
     args.add_argument("--gpus", type=int, default=4)
-    args.add_argument("--show", action="store_true")
     args.add_argument("--ckpt", type=str, default="latest.pth")
     args.add_argument("--save", type=str, default="results.xz")
     args.add_argument("--json", type=str, required=True)
@@ -60,10 +57,6 @@ def main():
 
     with lzma.open(root.joinpath(args.save), "wb") as f:
         pickle.dump(dict(results=items, summary=summary, **vars(args)), f)
-
-    if args.show:
-        for name, item in tqdm(list(items.items())):
-            visualize_bbox(**item, save=root)
 
 
 if __name__ == "__main__":

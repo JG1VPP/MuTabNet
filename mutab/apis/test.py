@@ -1,6 +1,6 @@
-import os
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
+from pathlib import Path
 from typing import List, Optional
 
 from mmdet.apis import init_detector
@@ -12,7 +12,7 @@ from mutab.metrics import TEDS
 def score(item, truth, ignore: Optional[List[str]]):
     teds_full = TEDS(ignore, struct_only=False)
     teds_html = TEDS(ignore, struct_only=True)
-    file_name = os.path.basename(item["path"])
+    file_name = Path(item["path"]).name
     if file_name not in truth:
         return None
     item.update(real=truth[file_name]["html"])
