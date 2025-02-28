@@ -3,13 +3,15 @@ from functools import partial
 from pathlib import Path
 from typing import List, Optional
 
+from mmcv import Config
 from mmdet.apis import init_detector
+from more_itertools import flatten, transpose
 from tqdm import tqdm
 
 from mutab.metrics import TEDS
 
 
-def score(item, truth, ignore: Optional[List[str]]):
+def test(item, truth, ignore: Optional[List[str]]):
     teds_full = TEDS(ignore, struct_only=False)
     teds_html = TEDS(ignore, struct_only=True)
     file_name = Path(item["path"]).name
@@ -24,16 +26,23 @@ def score(item, truth, ignore: Optional[List[str]]):
     return (file_name, item)
 
 
-def worker(n: int, paths: List[str], cfg: str, ckpt: str, truth):
-    model = init_detector(config=cfg, checkpoint=ckpt, device=n)
-    items = map(model.predict, tqdm(list(paths), disable=n > 0))
-    final = partial(score, truth=truth, ignore=model.cfg.ignore)
-    with ProcessPoolExecutor() as pool:
-        return list(pool.map(final, items))
+def worker(n: int, paths: List[str], conf: Config, ckpt: str, truth):
+    model = init_detector(conf, checkpoint=ckpt, device=n)
+    items = map(model.predict, tqdm(list(paths), disable=n))
+    score = partial(test, truth=truth, ignore=conf.ignore)
+    with ProcessPoolExecutor() as runtime:
+        return list(runtime.map(score, items))
 
 
-def evaluate(paths: List[List[str]], cfg: str, ckpt: str, truth):
-    with ProcessPoolExecutor(len(paths)) as pool:
-        process = partial(worker, cfg=cfg, ckpt=ckpt, truth=truth)
-        results = list(pool.map(process, *zip(*enumerate(paths))))
-        return dict(filter(None, sum(results, [])))
+def evaluate(paths: List[List[str]], conf: Config, ckpt: str, truth):
+    with ProcessPoolExecutor(len(paths)) as runtime:
+        process = partial(worker, conf=conf, ckpt=ckpt, truth=truth)
+        results = runtime.map(process, *transpose(enumerate(paths)))
+        return dict(filter(None, flatten(results)))
+
+
+def rescore(results, conf: Config, truth):
+    with ProcessPoolExecutor() as runtime:
+        score = partial(test, truth=dict(truth), ignore=conf.ignore)
+        items = tqdm(runtime.map(score, results), total=len(results))
+        return dict(filter(None, items))
