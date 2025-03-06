@@ -79,10 +79,10 @@ class TableHandler(nn.Module):
         return list(self.char2idx_html[v] for v in self.SOC)
 
     def str2idx(self, strings, char2idx):
-        return list([char2idx[v] for v in string] for string in strings)
+        return list([char2idx[v] for v in sample] for sample in strings)
 
-    def idx2str(self, indices, idx2char, join=lambda tokens: tokens):
-        return list(join([idx2char[i] for i in idx]) for idx in indices)
+    def idx2str(self, indices, idx2char):
+        return list([idx2char[i] for i in sample] for sample in indices)
 
     def pad_tensor(self, batch, value):
         pad = lambda seq, size: F.pad(seq, (0, size - len(seq)), value=value)
@@ -115,7 +115,7 @@ class TableHandler(nn.Module):
         for idx in batch.tolist():
             idx = next(split_at(idx, lambda n: n == self.EOS_CELL))
             idx = list(split_at(idx, lambda n: n == self.SEP_CELL))
-            strings.append(self.idx2str(idx, self.idx2char_cell, "".join))
+            strings.append(self.idx2str(idx, self.idx2char_cell))
         return strings
 
     def encode_bbox(self, batch):

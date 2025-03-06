@@ -3,6 +3,7 @@ name = "mutab"
 version = "0.1.0"
 dependencies = [
   "apted",
+  "cmap",
   "distance",
   "lxml",
   "mmcv-full<2",
