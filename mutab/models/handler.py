@@ -1,5 +1,5 @@
 from collections import defaultdict
-from functools import cached_property
+from functools import cached_property, partial
 from itertools import product
 from typing import Dict, List
 
@@ -136,9 +136,10 @@ class TableHandler(nn.Module):
             results.append(bbox[mask])
         return results
 
-    def item(self, html, cell, bbox, img_meta):
-        results = dict(real=self.revisor(**img_meta) if "html" in img_meta else None)
-        results.update(html=html, cell=cell, bbox=bbox, pred=self.revisor(html, cell))
+    def item(self, html, cell, bbox, img_meta, time):
+        results = dict(meta=img_meta)
+        results.update(html=html, cell=cell, real=self.revisor(**img_meta))
+        results.update(bbox=bbox, time=time, pred=self.revisor(html, cell))
         return results
 
     def forward(self, img_metas):
@@ -147,9 +148,9 @@ class TableHandler(nn.Module):
         bbox = self.encode_bbox([m["bbox"] for m in img_metas])
         return dict(html=html, back=html.fliplr(), cell=cell, bbox=bbox)
 
-    def reverse(self, html, cell, bbox, img_metas, **kwargs):
+    def reverse(self, html, cell, bbox, time, img_metas, **kwargs):
         mask = torch.isin(html, torch.tensor(self.SOC_HTML).to(html))
         bbox = self.decode_bbox(bbox, mask=mask, img_metas=img_metas)
         html = self.decode_html(html)
         cell = self.decode_cell(cell)
-        return tuple(map(self.item, html, cell, bbox, img_metas))
+        return tuple(map(partial(self.item, time=time), html, cell, bbox, img_metas))

@@ -47,5 +47,5 @@ class Revisor:
             text = text.replace(original, section)
         return self.template.format(text)
 
-    def __call__(self, html, cell, **kwargs):
-        return self.clean(self.merge(html, cell))
+    def __call__(self, html=None, cell=None, **kwargs):
+        return None if html is None else self.clean(self.merge(html, cell))

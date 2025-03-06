@@ -1,4 +1,5 @@
 from collections import ChainMap
+from time import perf_counter_ns
 
 import torch.distributed as dist
 import torch.nn as nn
@@ -115,12 +116,13 @@ class TableScanner(BaseModule):
         outputs = self.decoder(self.encoder(self.backbone(image)), **targets)
         return ChainMap(*[f(outputs, targets, img_metas) for f in self.loss])
 
-    def forward_test(self, images, img_metas):
-        return self.simple_test(images, img_metas)
+    def forward_test(self, image, img_metas):
+        return self.simple_test(image, img_metas)
 
     def simple_test(self, image, img_metas):
-        outputs = self.decoder.predict(self.encoder(self.backbone(image)))
-        return self.handler.reverse(**outputs, img_metas=tuple(img_metas))
+        time = perf_counter_ns()
+        item = self.decoder.predict(self.encoder(self.backbone(image)), time)
+        return tuple(self.handler.reverse(**item, img_metas=list(img_metas)))
 
     def predict(self, path: str):
         return dict(path=path, **model_inference(self, imread(path)))

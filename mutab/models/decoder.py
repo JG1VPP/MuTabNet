@@ -1,5 +1,7 @@
+import sys
 from functools import partial
-from typing import List
+from time import perf_counter_ns
+from typing import List, Optional
 
 import torch
 import torch.nn as nn
@@ -53,7 +55,6 @@ class Decoder(nn.Module):
         d_input: int,
         d_model: int,
         num_emb: int,
-        max_len: int,
         SOS: int,
         EOS: int,
         SEP: int,
@@ -75,8 +76,17 @@ class Decoder(nn.Module):
         self.cat = Linear(d_input, d_model)
         self.out = Linear(d_model, num_emb)
 
-        # prediction length
-        self.max_len = max_len
+        # other parameters
+        self.set_parameters_or_default(**kwargs)
+
+    def set_parameters_or_default(
+        self,
+        max_len: Optional[int] = None,
+        max_spd: Optional[int] = None,
+        **kwargs,
+    ):
+        self.MAX = max_len or sys.maxsize
+        self.SPD = max_spd or sys.maxsize
 
     def forward(self, img, seq, aux, best=False):
         assert seq.ndim == 2
@@ -120,7 +130,7 @@ class Decoder(nn.Module):
         seq = torch.hstack([sos, sep, eos])
 
         # sequential inference
-        while yet and seq.size(1) <= self.max_len:
+        while yet and seq.size(1) <= self.MAX:
             seq, yet = self.enlarge(img, seq, aux)
 
         return self(img, seq, aux, best=True)
@@ -133,6 +143,7 @@ class Decoder(nn.Module):
         mask.logical_and_(out.ne(self.SEP))
         mask.logical_and_(out.ne(self.EOS).cumprod(dim=1))
         mask.logical_and_(seq.ne(self.EOS).cumprod(dim=1))
+        mask.logical_and_(mask.cumsum(dim=1).le(self.SPD))
 
         # remove old tokens
         out.mul_(mask.to(out))
@@ -279,18 +290,22 @@ class TableDecoder(nn.Module):
             bbox=o_bbox,
         )
 
-    def predict(self, img):
+    def predict(self, img, time: int):
         # LtoR
         h_LtoR = self.LtoR.expand(len(img), 1, 2)
 
         # structure prediction
         h_html, o_html = self.html.predict(img, h_LtoR)
+        t_html = perf_counter_ns()
 
         # structure refinement
         h_html, h_grid = self.grid(img, h_html, o_html)
         h_grid, o_bbox = self.bbox(img, h_html, h_grid)
+        t_bbox = perf_counter_ns()
 
         # character prediction
         h_cell, o_cell = self.cell.predict(img, h_grid)
+        t_cell = perf_counter_ns()
 
-        return dict(html=o_html, cell=o_cell, bbox=o_bbox)
+        time = dict(init=time, html=t_html, bbox=t_bbox, cell=t_cell)
+        return dict(html=o_html, cell=o_cell, bbox=o_bbox, time=time)

@@ -21,6 +21,7 @@ HARD = "complex"
 def options():
     args = argparse.ArgumentParser()
     args.add_argument("--gpus", type=int, default=4)
+    args.add_argument("--rate", type=int, default=None)
     args.add_argument("--ckpt", type=str, default="latest.pth")
     args.add_argument("--save", type=str, default="results.xz")
     args.add_argument("--load", type=str, required=False)
@@ -44,6 +45,7 @@ def process(args, items=[]):
             items = pickle.load(f)["results"].values()
 
     def infer(conf: Config, args, truth):
+        conf.model.decoder.update(max_spd=args.rate)
         paths = divide(args.gpus, Path(args.path).rglob("*.png"))
         return evaluate(paths, conf, ckpt=args.ckpt, truth=truth)
 
@@ -55,7 +57,18 @@ def process(args, items=[]):
     easy = list(v for v in items.values() if v["type"] == EASY)
     hard = list(v for v in items.values() if v["type"] == HARD)
 
+    def time_stamp(item, key):
+        return times[key] if (times := item.get("time")) is not None else 0
+
+    def count_time(item, key):
+        return 1e-9 * (time_stamp(item, key) - time_stamp(item, "init"))
+
+    time_html = np.mean([count_time(v, "html") for v in items.values()])
+    time_bbox = np.mean([count_time(v, "bbox") for v in items.values()])
+    time_cell = np.mean([count_time(v, "cell") for v in items.values()])
+
     summary = {}
+    summary.update(time=dict(html=time_html, bbox=time_bbox, cell=time_cell))
     summary.update(html=np.mean([v["TEDS"]["html"] for v in items.values()]))
     summary.update(full=np.mean([v["TEDS"]["full"] for v in items.values()]))
     summary.update(easy=np.mean([v["TEDS"]["full"] for v in easy]))
