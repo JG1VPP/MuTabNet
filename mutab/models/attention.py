@@ -11,7 +11,7 @@ from mutab.models.factory import ATTENTIONS, build_attention
 
 class Mask(nn.Module):
     def forward(self, x, mask):
-        return x.where(mask, torch.finfo(x.dtype).min)
+        return x.where(mask.to(x.device), torch.finfo(x.dtype).min)
 
 
 class Linear(nn.Sequential):
@@ -69,6 +69,17 @@ class GlobalAttention(Attention):
 
 
 @ATTENTIONS.register_module()
+class CausalAttention(GlobalAttention):
+    @property
+    def causal(self):
+        return True
+
+    def attention(self, q, k, v, **kwargs):
+        mask = torch.ones(q.size(-2), k.size(-2), dtype=bool)
+        return super().attention(q, k, v=v, mask=mask.tril())
+
+
+@ATTENTIONS.register_module()
 class WindowAttention(GlobalAttention):
     def __init__(self, window: int, **kwargs):
         super().__init__(**kwargs)
@@ -92,8 +103,12 @@ class WindowAttention(GlobalAttention):
         j = self.unfold(i).mT
 
         # regions
-        req = self.bucket(cell)
-        rek = self.unfold(req).mT
+        if cell is not None:
+            req = self.bucket(cell)
+            rek = self.unfold(req).mT
+        else:
+            req = torch.ones(1).to(i)
+            rek = torch.ones(1).to(j)
 
         # masking
         mask = i.ge(j).logical_and(j.ne(-1))
