@@ -169,10 +169,10 @@ test_pipeline = [
 
 loader = dict(
     type="TableHardDiskLoader",
-    max_len_html=max_len_html,
     parser=dict(
         type="TableStrParser",
         cell_tokens=cell_tokens,
+        empty_bbox=(0, 0, 0, 0),
     ),
 )
 
