@@ -53,15 +53,19 @@ class GlobalAttention(Attention):
         super().__init__(**kwargs)
         self.drop = nn.Dropout(dropout)
         self.mask = Mask()
+        self.hook = lambda p: p
 
     @property
     def causal(self):
         return False
 
+    def weight(self, p, q):
+        return self.hook(p.softmax(dim=-1))
+
     def attention(self, q, k, v, mask=None, **kwargs):
         p = q.matmul(k.mT.div(math.sqrt(v.size(-1))))
         p = p if mask is None else self.mask(p, mask)
-        return self.drop(p.softmax(dim=-1)).matmul(v)
+        return self.drop(self.weight(p, q)).matmul(v)
 
 
 @ATTENTIONS.register_module()
