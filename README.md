@@ -6,9 +6,15 @@ End-to-End table OCR model using a hierarchical Transformer that outputs HTML ta
 
 ### Install
 
+Install [PyTorch](https://pytorch.org) 2.0 and run the following command:
+
 ```sh
 pip install -e .
 ```
+
+### Models
+
+See [releases](https://github.com/JG1VPP/MuTabNet/releases).
 
 ### Datasets
 

@@ -13,11 +13,13 @@ dependencies = [
   "positional-encodings[pytorch]",
   "ranger@git+https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer",
   "rotary-embedding-torch",
-  "torch>=2,<2.1",
   "tqdm",
   "urllib3<2",
   "yapf==0.40.1",
 ]
+
+[build-system]
+requires = ["setuptools", "torch>=2,<2.1"]
 
 [tool.setuptools.packages.find]
 include = ["mutab"]
