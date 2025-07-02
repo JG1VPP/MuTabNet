@@ -8,10 +8,11 @@ from mutab.utils import get_logger
 
 @PARSERS.register_module()
 class TableStrParser:
-    def __init__(self, cell_tokens):
+    def __init__(self, cell_tokens, empty_bbox):
         assert isinstance(cell_tokens, list)
-        assert len(cell_tokens)
+        assert isinstance(empty_bbox, tuple)
         self.cell_tokens = cell_tokens
+        self.empty_bbox = empty_bbox
 
     def align(self, html, bbox, **info):
         queue = iter(bbox)
@@ -21,21 +22,42 @@ class TableStrParser:
                 boxes[idx] = next(queue)
         return dict(html=html, bbox=boxes, **info)
 
+    def parse(self, ann: str, **info):
+        list_b = []
+        list_c = []
+
+        with open(ann) as f:
+            path = f.readline().strip()
+            html = f.readline().strip().split(",")
+            body = list(f.readlines())
+
+        for value in body:
+            bbox, cell = value.strip().split("<;>")
+            bbox = tuple(map(int, bbox.split(",")))
+            cell = cell.split("\t")
+            list_b.append(bbox)
+            if bbox != self.empty_bbox:
+                list_c.append(cell)
+
+        info.update(filename=path, html=html)
+        info.update(cell=list_c, bbox=list_b)
+
+        return info
+
     def __call__(self, info):
-        return self.align(**info)
+        return self.align(**self.parse(**info))
 
 
 @LOADERS.register_module()
 class TableHardDiskLoader:
-    def __init__(self, parser: dict, ann_file: str, max_len_html: int):
-        self.parser = build_parser(parser)
-        self.infos = self.load(ann_file, max_len_html)
+    def __init__(self, parser: dict, ann_file: str):
+        self.infos = self.load(parser, ann_file)
 
     def __len__(self):
         return len(self.infos)
 
     def __getitem__(self, index):
-        return self.parser(self.infos[index])
+        return self.infos[index]
 
     def __iter__(self):
         self.idx = 0
@@ -48,25 +70,12 @@ class TableHardDiskLoader:
             return data
         raise StopIteration
 
-    def load(self, ann_file: str, max_len_html: int):
-        data = []
+    def load(self, parser: dict, ann_file: str):
+        parser = build_parser(parser)
+        tables = []
         logger = get_logger()
         logger.info(f"Loading {ann_file} ...")
         for f in Path(ann_file).rglob("*.txt"):
-            with open(f) as f:
-                data.append(self.parse(f))
-        logger.info(f"{len(data)} tables were loaded from {ann_file}")
-        return list(v for v in data if len(v["html"]) <= max_len_html)
-
-    def parse(self, f):
-        path = f.readline().strip()
-        html = f.readline().strip().split(",")
-        bbox_list = []
-        cell_list = []
-        for value in f.readlines():
-            bbox, cell = value.strip().split("<;>")
-            bbox = tuple(map(int, bbox.split(",")))
-            bbox_list.append(bbox)
-            if bbox != (0, 0, 0, 0):
-                cell_list.append(cell.split("\t"))
-        return dict(filename=path, html=html, cell=cell_list, bbox=bbox_list)
+            tables.append(parser(dict(ann=f)))
+        logger.info(f"{len(tables)} tables")
+        return tables
