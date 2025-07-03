@@ -7,6 +7,7 @@ from lxml.etree import tostring
 from lxml.html import HTMLParser, fromstring
 
 from mutab.models.factory import REVISORS, build_revisor
+from mutab.syntax import otsl_to_html
 
 
 class RevisorModule(ABC):
@@ -116,6 +117,22 @@ class Replace(RevisorModule):
             html = html.replace(dump, post)
 
         # update html
+        results.update(html=html)
+
+        return results
+
+
+@REVISORS.register_module()
+class ToHTML(RevisorModule):
+    def process(self, results):
+        html = results.get("html")
+
+        # in service
+        if html is None:
+            return results
+
+        # update html
+        html = otsl_to_html(html)
         results.update(html=html)
 
         return results
