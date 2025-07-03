@@ -142,10 +142,10 @@ class TableHandler(nn.Module):
         results.update(bbox=bbox, time=time, pred=self.revisor(html, cell))
         return results
 
-    def forward(self, img_metas):
-        html = self.encode_html([m["html"] for m in img_metas])
-        cell = self.encode_cell([m["cell"] for m in img_metas])
-        bbox = self.encode_bbox([m["bbox"] for m in img_metas])
+    def forward(self, img_metas, device):
+        html = self.encode_html([m["html"] for m in img_metas]).to(device)
+        cell = self.encode_cell([m["cell"] for m in img_metas]).to(device)
+        bbox = self.encode_bbox([m["bbox"] for m in img_metas]).to(device)
         return dict(html=html, back=html.fliplr(), cell=cell, bbox=bbox)
 
     def reverse(self, html, cell, bbox, time, img_metas, **kwargs):

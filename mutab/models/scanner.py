@@ -1,4 +1,5 @@
 from collections import ChainMap
+from functools import partial
 from time import perf_counter_ns
 
 import torch.distributed as dist
@@ -58,15 +59,12 @@ class TableScanner(BaseModule):
         assert isinstance(html_loss, list) and len(html_loss)
         assert isinstance(cell_loss, list) and len(cell_loss)
 
+        pad_html = partial(factory.build_loss, ignore=self.handler.PAD_HTML)
+        pad_cell = partial(factory.build_loss, ignore=self.handler.PAD_CELL)
+
         self.loss = nn.ModuleList()
-
-        pad_html = dict(ignore_index=self.handler.PAD_HTML)
-        pad_cell = dict(ignore_index=self.handler.PAD_CELL)
-
-        for loss in html_loss:
-            self.loss.append(factory.build_loss(loss, **pad_html))
-        for loss in cell_loss:
-            self.loss.append(factory.build_loss(loss, **pad_cell))
+        self.loss.extend(tuple(map(pad_html, html_loss)))
+        self.loss.extend(tuple(map(pad_cell, cell_loss)))
 
         self.init_weights()
 
@@ -112,7 +110,7 @@ class TableScanner(BaseModule):
         return dict(loss=loss, log_vars=logs)
 
     def forward_train(self, image, img_metas):
-        targets = self.handler.forward(img_metas)
+        targets = self.handler.forward(img_metas, device=image.device)
         outputs = self.decoder(self.encoder(self.backbone(image)), **targets)
         return ChainMap(*[f(outputs, targets, img_metas) for f in self.loss])
 

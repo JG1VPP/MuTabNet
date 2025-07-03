@@ -1,123 +1,128 @@
+from abc import ABC, abstractmethod
+
 import torch
 import torch.nn as nn
 
-from mutab.models.factory import LOSSES
+from mutab.models.factory import LOSSES, build_loss
 
 
-@LOSSES.register_module()
-class CELoss(nn.Module):
-    def __init__(self, key: str, ignore_index: int):
+class Loss(nn.Module, ABC):
+    label = "loss_{}"
+
+    def __init__(self, key: str, ignore: int, **kwargs):
         super().__init__()
 
         # keys
         self.key = key
-        self.label = "loss_ce_{}".format(key)
+        self.loss = self.build_loss(ignore, **kwargs)
+        self.label = self.label.format(key, **kwargs)
 
-        # loss
-        self.loss = self.build_loss(ignore_index)
+    @abstractmethod
+    def build_loss(self, ignore: int, **kwargs):
+        pass
 
-    def build_loss(self, ignore_index):
-        return nn.CrossEntropyLoss(ignore_index=ignore_index)
+    def format(self, outputs, targets):
+        pred = outputs[self.key]
+        true = targets[self.key]
+        return pred, true
+
+    def forward(self, outputs, targets, img_metas=None):
+        inputs = self.format(outputs, targets)
+        return {self.label: self.loss(*inputs)}
+
+
+@LOSSES.register_module()
+class CELoss(Loss):
+    label = "loss_ce_{}"
+
+    def build_loss(self, ignore: int, **kwargs):
+        return nn.CrossEntropyLoss(ignore_index=ignore)
 
     def format(self, outputs, targets):
         # outputs [N, C, L]
         # targets [N, L]
         logit = outputs[self.key].mT
         label = targets[self.key][:, 1:]
-        return logit, label.to(logit.device)
-
-    def forward(self, outputs, targets, img_metas=None):
-        logit, label = self.format(outputs, targets)
-        return {self.label: self.loss(logit, label)}
+        return logit, label
 
 
 @LOSSES.register_module()
-class KLLoss(nn.Module):
-    def __init__(self, key: str, rev: str, ignore_index: int):
-        super().__init__()
+class KLLoss(Loss):
+    label = "loss_kl_{}"
 
-        # keys
-        self.key = key
+    def build_loss(self, ignore: int, rev: str, **kwargs):
+        # key
         self.rev = rev
 
-        # labels
-        self.loss_key = f"loss_kl_{key}"
-        self.loss_rev = f"loss_kl_{rev}"
-
-        # prob
-        self.sm_p = nn.Softmax(dim=2)
-        self.sm_q = nn.LogSoftmax(dim=2)
-
-        # loss
-        self.loss = self.build_loss("sum")
-
-        # <PAD>
-        pad = torch.tensor(ignore_index)
+        # PAD
+        pad = torch.tensor(ignore).int()
         self.register_buffer("PAD", pad)
 
-    def build_loss(self, reduction):
-        return nn.KLDivLoss(reduction=reduction)
+        # prob
+        self.p = nn.Softmax(dim=2)
+        self.q = nn.LogSoftmax(dim=2)
+
+        # loss
+        return nn.KLDivLoss(reduction="sum")
 
     def format(self, outputs, targets):
         # outputs [N, L, C]
         logit_f = outputs[self.key][:, :-1]
         logit_b = outputs[self.rev][:, :-1].fliplr()
 
-        # detect <PAD>
-        text = targets[self.key][:, 1:-1].unsqueeze(-1)
-        mask = ~torch.isin(text.to(self.PAD), self.PAD)
+        # detect PAD
+        text = targets[self.key][:, 1:-1]
+        mask = text.ne(self.PAD).unsqueeze(-1)
 
         # P: target
-        p_f = self.sm_p(logit_b.mul(mask)).detach()
-        p_b = self.sm_p(logit_f.mul(mask)).detach()
-
         # Q: output
-        q_f = self.sm_q(logit_f.mul(mask))
-        q_b = self.sm_q(logit_b.mul(mask))
+        p = self.p(logit_b.mul(mask)).detach()
+        q = self.q(logit_f.mul(mask))
 
-        return (q_f, p_f), (q_b, p_b), mask
+        return (q, p), mask.sum()
 
     def forward(self, outputs, targets, img_metas=None):
-        qp_f, qp_b, mask = self.format(outputs, targets)
-        kl_f = self.loss(*qp_f).div(mask.sum().clamp(1))
-        kl_b = self.loss(*qp_b).div(mask.sum().clamp(1))
-        return {self.loss_key: kl_f, self.loss_rev: kl_b}
+        qp, denom = self.format(outputs, targets)
+        loss = self.loss(*qp).div(denom.clamp(1))
+        return {self.label: loss}
 
 
 @LOSSES.register_module()
-class BBLoss(nn.Module):
-    def __init__(self, ignore_index: str):
-        super().__init__()
+class BBLoss(Loss):
+    def build_loss(self, ignore: int, cls: str, **kwargs):
+        # key
+        self.cls = cls
 
-        # loss
-        self.loss = self.build_loss("sum")
-
-        # <PAD>
-        pad = torch.tensor(ignore_index)
+        # PAD
+        pad = torch.tensor(ignore).int()
         self.register_buffer("PAD", pad)
 
-    def build_loss(self, reduction):
-        return nn.L1Loss(reduction=reduction)
+        # MAE
+        return nn.L1Loss(reduction="sum")
 
     def format(self, outputs, targets):
         # outputs [N, L, 4]
-        pred = outputs["bbox"]
+        pred = outputs[self.key]
 
         # targets [N, L, 4]
-        bbox = targets["bbox"][:, 1:].to(pred.device)
+        bbox = targets[self.key][:, 1:]
 
         # structural tokens
-        html = targets["html"][:, 1:].to(pred.device)
+        text = targets[self.cls][:, 1:]
 
-        # detect <PAD>
-        mask = ~torch.eq(html, self.PAD).unsqueeze(-1)
+        # detect PAD
+        mask = text.ne(self.PAD).unsqueeze(2)
 
-        # remove <PAD>
+        assert pred.ndim == 3
+        assert bbox.ndim == 3
+        assert mask.ndim == 3
+
+        # remove PAD
         pred = pred.masked_select(mask)
         bbox = bbox.masked_select(mask)
 
-        assert pred.dim() == 1
-        assert bbox.dim() == 1
+        assert pred.ndim == 1
+        assert bbox.ndim == 1
 
         # samples
         pair_h = pred[0::2], bbox[0::2]
@@ -130,3 +135,9 @@ class BBLoss(nn.Module):
         loss_h = self.loss(*pair_h).div(mask.sum().clamp(1))
         loss_v = self.loss(*pair_v).div(mask.sum().clamp(1))
         return dict(loss_h=loss_h, loss_v=loss_v)
+
+
+@LOSSES.register_module()
+class Nested(Loss):
+    def build_loss(self, ignore: int, **kwargs):
+        return build_loss(kwargs["loss"])

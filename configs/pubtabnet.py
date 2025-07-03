@@ -99,7 +99,8 @@ model = dict(
         dict(type="CELoss", key="html"),
         dict(type="CELoss", key="back"),
         dict(type="KLLoss", key="html", rev="back"),
-        dict(type="BBLoss"),
+        dict(type="KLLoss", key="back", rev="html"),
+        dict(type="BBLoss", key="bbox", cls="html"),
     ],
     cell_loss=[
         dict(type="CELoss", key="cell"),
