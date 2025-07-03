@@ -53,6 +53,7 @@ model = dict(
     decoder=dict(
         type="TableDecoder",
         html_decoder=dict(
+            type="Decoder",
             blocks=[
                 dict(
                     att1=dict(type="WindowAttention"),
@@ -69,6 +70,7 @@ model = dict(
             ],
         ),
         cell_decoder=dict(
+            type="Decoder",
             blocks=[
                 dict(
                     att1=dict(type="WindowAttention"),
@@ -77,6 +79,7 @@ model = dict(
             ],
         ),
         html_fetcher=dict(
+            type="Fetcher",
             blocks=[
                 dict(
                     att1=dict(type="GlobalAttention"),
@@ -84,7 +87,7 @@ model = dict(
                 ),
             ],
         ),
-        bbox_locator=dict(pass_html=True),
+        bbox_locator=dict(type="Locator", pass_html=True),
         heads=8,
         window=300,
         d_model=512,
