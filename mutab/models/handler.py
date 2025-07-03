@@ -8,8 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from more_itertools import flatten, split_at
 
-from mutab.models.factory import HANDLERS
-from mutab.models.revisor import Revisor
+from mutab.models.factory import HANDLERS, build_revisor
 
 
 @HANDLERS.register_module()
@@ -19,7 +18,6 @@ class TableHandler(nn.Module):
         html_dict_file: str,
         cell_dict_file: str,
         SOC: List[str],
-        EOC: List[str],
         revisor: Dict[str, str],
     ):
         super().__init__()
@@ -28,7 +26,6 @@ class TableHandler(nn.Module):
         assert isinstance(cell_dict_file, str)
 
         assert isinstance(SOC, list)
-        assert isinstance(EOC, list)
 
         self.SOC = SOC
 
@@ -52,7 +49,7 @@ class TableHandler(nn.Module):
         self.char2idx_html = defaultdict(lambda: self.UKN_HTML, self.char2idx_html)
         self.char2idx_cell = defaultdict(lambda: self.UKN_CELL, self.char2idx_cell)
 
-        self.revisor = Revisor(**revisor, SOC=SOC, EOC=EOC)
+        self.revisor = build_revisor(revisor)
 
     def load(self, dict_file: str, enc="utf-8"):
         with open(dict_file, encoding=enc) as f:

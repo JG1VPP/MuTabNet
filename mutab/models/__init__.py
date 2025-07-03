@@ -5,6 +5,7 @@ from .factory import build_detector
 from .handler import TableHandler
 from .loss import BBLoss, CELoss, KLLoss, Nested
 from .network import Decoder, Fetcher, Locator
+from .revisor import TableRevisor
 from .scanner import TableScanner
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "TableEncoder",
     "TableHandler",
     "TableResNet",
+    "TableRevisor",
     "TableScanner",
     "build_detector",
 ]
