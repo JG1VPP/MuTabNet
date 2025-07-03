@@ -31,11 +31,11 @@ class Attention(nn.Module, abc.ABC):
         self.w = Linear(d_model, d_model)
 
     def forward(self, q, k, v, **kwargs):
-        q = self.q(q).view(len(q), *self.lhd).transpose(1, 2)
-        k = self.k(k).view(len(k), *self.lhd).transpose(1, 2)
-        v = self.v(v).view(len(v), *self.lhd).transpose(1, 2)
-        x = self.attention(q, k, v, **kwargs).transpose(1, 2)
-        return self.w(x.contiguous().flatten(start_dim=2))
+        x = self.q(q).view(len(q), *self.lhd).swapaxes(1, 2)
+        k = self.k(k).view(len(k), *self.lhd).swapaxes(1, 2)
+        v = self.v(v).view(len(v), *self.lhd).swapaxes(1, 2)
+        x = self.attention(x, k, v, **kwargs).swapaxes(1, 2)
+        return self.w(x.contiguous().flatten(-2)).view_as(q)
 
     @property
     @abc.abstractmethod

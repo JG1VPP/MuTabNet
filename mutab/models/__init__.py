@@ -1,6 +1,6 @@
 from .backbone import TableResNet
 from .decoder import TableDecoder
-from .encoder import PositionalEncoding2D
+from .encoder import TableEncoder
 from .factory import build_detector
 from .handler import TableHandler
 from .loss import BBLoss, CELoss, KLLoss
@@ -10,8 +10,8 @@ __all__ = [
     "BBLoss",
     "CELoss",
     "KLLoss",
-    "PositionalEncoding2D",
     "TableDecoder",
+    "TableEncoder",
     "TableHandler",
     "TableResNet",
     "TableScanner",

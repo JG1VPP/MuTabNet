@@ -44,8 +44,11 @@ model = dict(
         gcb4=dict(depth=3, **gcb, gca=gca),
     ),
     encoder=dict(
-        type="PositionalEncoding2D",
-        channels=512,
+        type="TableEncoder",
+        blocks=[],
+        heads=8,
+        d_model=512,
+        dropout=0.2,
     ),
     decoder=dict(
         type="TableDecoder",
