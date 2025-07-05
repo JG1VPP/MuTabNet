@@ -26,7 +26,16 @@ Download the following datasets:
 
 ### Preprocess
 
-Follow [MTL-TabNet instructions](https://github.com/namtuanly/MTL-TabNet#data-preprocess).
+Run [preprocess.py](preprocess.py) as follows:
+
+```sh
+$ python preprocess.py datasets/FinTabNet.yaml
+$ python preprocess.py datasets/FinTabSub.yaml
+$ python preprocess.py datasets/PubTab250.yaml
+$ python preprocess.py datasets/PubTabNet.yaml
+$ python preprocess.py datasets/PubTabSub.yaml
+```
+
 The datasets must be placed in `data` directory as follows:
 
 ```sh
@@ -79,7 +88,7 @@ pubtabnet/
 
 ### Training
 
-Run the following command to start training using four GPUs:
+Run [train.py](train.py) to start training using four GPUs:
 
 ```sh
 name=pubtab250
@@ -90,7 +99,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 PORT=29500 ./train.sh ./configs/$name.py $save 4
 
 ### Evaluation
 
-Run the following command to evaluate the model and calculate TEDS score:
+Run [test.py](test.py) to evaluate the model and calculate TEDS score:
 
 ```sh
 path=~/data/icdar-task-b/final_eval
@@ -103,12 +112,12 @@ For FinTabNet, we use validation set including 10,656 tables as test set in imit
 
 ## Requirements
 
-We recommend that you use at least four V100 32GB GPUs or two A100 80GB GPU.
+We recommend that you use at least four NVIDIA V100 32GB GPUs.
 
 ## License
 
 This project is licensed under the MIT License.
-See LICENSE for more details.
+See [LICENSE](LICENSE) for more details.
 
 ## Citation
 
