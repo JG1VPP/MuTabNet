@@ -17,16 +17,6 @@ eb_tokens = {
     "<eb10></eb10>": "<td><b> \u2028 \u2028 </b></td>",
 }
 
-revisions = {
-    "^.*$": eb_tokens,
-    "<thead>(.*?)</thead>": {
-        r'(<td( [a-z]+="(\d)+")*?>)(.*?)</td>': r"\g<1><b>\g<4></b></td>",
-        "<b></b>": "",
-        "<b><b>": "<b>",
-        "</b></b>": "</b>",
-    },
-}
-
 cell_tokens = ["<td></td>", "<td", *eb_tokens]
 
 gca = ["GCA"]
@@ -110,10 +100,34 @@ model = dict(
         html_dict_file="alphabet/pubtabnet/structure_alphabet.txt",
         cell_dict_file="alphabet/pubtabnet/character_alphabet.txt",
         SOC=["<td></td>", "<td"],
-        EOC=["<td></td>", "</td>"],
         revisor=dict(
-            template="{}",
-            patterns=revisions,
+            type="TableRevisor",
+            pipeline=[
+                dict(
+                    type="TableCombine",
+                    SOC=["<td></td>", "<td"],
+                    EOC=["<td></td>", "</td>"],
+                ),
+                dict(
+                    type="TableReplace",
+                    replace=eb_tokens,
+                ),
+                dict(
+                    type="TableReplace",
+                    replace={
+                        r"<td[^>]*>(?=.*</thead>)": r"\g<0><b>",
+                        r"</td>(?=.*</thead>)": r"</b></td>",
+                    },
+                ),
+                dict(
+                    type="TableReplace",
+                    replace={
+                        "<b></b>": "",
+                        "<b><b>": "<b>",
+                        "</b></b>": "</b>",
+                    },
+                ),
+            ],
         ),
     ),
 )
