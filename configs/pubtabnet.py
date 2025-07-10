@@ -99,10 +99,11 @@ model = dict(
         type="TableHandler",
         html_dict_file="alphabet/pubtabnet/structure_alphabet.txt",
         cell_dict_file="alphabet/pubtabnet/character_alphabet.txt",
-        SOC=["<td></td>", "<td"],
+        SOC=["D"],
         revisor=dict(
             type="TableRevisor",
             pipeline=[
+                dict(type="ToHTML"),
                 dict(
                     type="TableCombine",
                     SOC=["<td></td>", "<td"],
@@ -140,6 +141,7 @@ train_pipeline = [
         size=(520, 520),
     ),
     dict(type="TableBboxEncode"),
+    dict(type="ToOTSL"),
     dict(type="ToTensorOCR"),
     dict(
         type="NormalizeOCR",
@@ -155,6 +157,8 @@ train_pipeline = [
             "img_shape",
             "pad_shape",
             "img_scale",
+            "rows",
+            "cols",
             "html",
             "cell",
             "bbox",

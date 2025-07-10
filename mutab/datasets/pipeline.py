@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from mmdet.datasets.builder import PIPELINES
 
+from mutab.syntax import html_to_otsl
+
 
 @PIPELINES.register_module()
 class TableResize:
@@ -99,3 +101,12 @@ class TableBboxEncode:
         results.update(html=results["img_info"].pop("html"))
         results.update(cell=results["img_info"].pop("cell"))
         results.update(bbox=results["img_info"].pop("bbox"))
+
+
+@PIPELINES.register_module()
+class ToOTSL:
+    def __call__(self, results):
+        otsl, bbox, _, n = html_to_otsl(**results)
+        results.update(html=otsl, bbox=np.stack(bbox))
+        results.update(rows=otsl[::n], cols=otsl[:n:])
+        return results

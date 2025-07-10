@@ -17,6 +17,7 @@ train_pipeline = [
     ),
     dict(type="TableBboxFlip"),
     dict(type="TableBboxEncode"),
+    dict(type="ToOTSL"),
     dict(type="ToTensorOCR"),
     dict(
         type="NormalizeOCR",
@@ -32,6 +33,8 @@ train_pipeline = [
             "img_shape",
             "pad_shape",
             "img_scale",
+            "rows",
+            "cols",
             "html",
             "cell",
             "bbox",

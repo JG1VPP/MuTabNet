@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List
 
 from mutab.models.factory import REVISORS, build_revisor
+from mutab.syntax import otsl_to_html
 
 
 class RevisorModule(ABC):
@@ -91,6 +92,22 @@ class TableReplace(RevisorModule):
             html = re.sub(*pattern, html)
 
         # update html
+        results.update(html=html)
+
+        return results
+
+
+@REVISORS.register_module()
+class ToHTML(RevisorModule):
+    def process(self, results):
+        html = results.get("html")
+
+        # in service
+        if html is None:
+            return results
+
+        # update html
+        html = otsl_to_html(html)
         results.update(html=html)
 
         return results
