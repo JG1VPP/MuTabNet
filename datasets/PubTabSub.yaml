@@ -1,8 +1,8 @@
 type: PubTabNet
 load:
-  dir: ~/data/pubtabnet/
-  jsonl:
-  - ~/data/pubtabnet/PubTabNet_2.0.0.jsonl
+  parts:
+  - jsonl: ~/data/pubtabnet/PubTabNet_2.0.0.jsonl
+    image: ~/data/pubtabnet/
 dump:
   dir: ~/data/mmocr_pubtabsub/
   json: ~/data/ground_truth_pubtabsub.json

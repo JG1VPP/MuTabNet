@@ -1,10 +1,12 @@
 type: FinTabNet
 load:
-  dir: ~/data/fintabnet/img_tables/
-  jsonl:
-  - ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_train.jsonl
-  - ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_val.jsonl
-  - ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_test.jsonl
+  parts:
+  - jsonl: ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_train.jsonl
+    image: ~/data/fintabnet/img_tables/
+  - jsonl: ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_val.jsonl
+    image: ~/data/fintabnet/img_tables/
+  - jsonl: ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_test.jsonl
+    image: ~/data/fintabnet/img_tables/
 dump:
   dir: ~/data/mmocr_fintabnet/
   json: ~/data/ground_truth_fintabnet.json

@@ -21,12 +21,21 @@ See [releases](https://github.com/JG1VPP/MuTabNet/releases).
 Download the following datasets:
 
 - [FinTabNet](https://developer.ibm.com/data/fintabnet)
-- [PubTabNet](https://developer.ibm.com/exchanges/data/all/pubtabnet)
+- [PubTabNet](https://github.com/ibm-aur-nlp/PubTabNet)
 - [ICDAR Task-B Test Data](https://github.com/ajjimeno/icdar-task-b)
 
 ### Preprocess
 
-Follow [MTL-TabNet instructions](https://github.com/namtuanly/MTL-TabNet#data-preprocess).
+Run [preprocess.py](preprocess.py) as follows:
+
+```sh
+$ python preprocess.py datasets/FinTabNet.yaml
+$ python preprocess.py datasets/FinTabSub.yaml
+$ python preprocess.py datasets/PubTab250.yaml
+$ python preprocess.py datasets/PubTabNet.yaml
+$ python preprocess.py datasets/PubTabSub.yaml
+```
+
 The datasets must be placed in `data` directory as follows:
 
 ```sh
@@ -42,6 +51,7 @@ fintabnet/
     val/
 ground_truth_fintabnet.json
 ground_truth_pubtabnet.json
+ground_truth_syntabnet.json
 icdar-task-b/
   final_eval/
     000221630ba33f9118f2671a715d6962e08d6b76a5a0c77a9fe26c291df763b0.png
@@ -66,6 +76,15 @@ mmocr_pubtabnet/
     PMC1064080_002_00.txt
     PMC1064094_007_00.txt
   val/
+mmocr_syntabnet/
+  test/
+  train/
+    image_000000_1634629328.513163.txt
+    image_000000_1634629370.543605.txt
+    image_000000_1634629424.098128.txt
+    image_000001_1634629104.265115.txt
+    image_000001_1634629370.544624.txt
+  val/
 pubtabnet/
   PubTabNet_2.0.0.jsonl
   train/
@@ -75,11 +94,18 @@ pubtabnet/
     PMC1064080_002_00.png
     PMC1064094_007_00.png
   val/
+synthtabnet/
+  fintabnet/
+  marketing/
+  pubtabnet/
+  sparse/
 ```
+
+The annotation format is fully compatible with [MTL-TabNet](https://github.com/namtuanly/MTL-TabNet).
 
 ### Training
 
-Run the following command to start training using four GPUs:
+Run [train.py](train.py) to start training using four GPUs:
 
 ```sh
 name=pubtab250
@@ -90,7 +116,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 PORT=29500 ./train.sh ./configs/$name.py $save 4
 
 ### Evaluation
 
-Run the following command to evaluate the model and calculate TEDS score:
+Run [test.py](test.py) to evaluate the model and calculate TEDS score:
 
 ```sh
 path=~/data/icdar-task-b/final_eval
@@ -103,12 +129,12 @@ For FinTabNet, we use validation set including 10,656 tables as test set in imit
 
 ## Requirements
 
-We recommend that you use at least four V100 32GB GPUs or two A100 80GB GPU.
+We recommend that you use at least four NVIDIA V100 32GB GPUs.
 
 ## License
 
 This project is licensed under the MIT License.
-See LICENSE for more details.
+See [LICENSE](LICENSE) for more details.
 
 ## Citation
 
