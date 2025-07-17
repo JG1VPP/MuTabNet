@@ -3,7 +3,9 @@ name = "mutab"
 version = "0.1.0"
 dependencies = [
   "apted",
+  "dacite",
   "distance",
+  "jsonlines",
   "lxml",
   "mmcv-full<2",
   "mmdet<3",
@@ -13,6 +15,8 @@ dependencies = [
   "positional-encodings[pytorch]",
   "ranger@git+https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer",
   "rotary-embedding-torch",
+  "ruamel-yaml",
+  "toolz",
   "tqdm",
   "urllib3<2",
   "yapf==0.40.1",
