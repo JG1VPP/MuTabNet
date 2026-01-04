@@ -231,7 +231,7 @@ data = dict(
 )
 
 # optimizer
-optimizer = dict(type="Ranger", lr=1e-3)
+optimizer = dict(type="AdamW", lr=1e-3)
 optimizer_config = dict(grad_clip=dict(max_norm=30, norm_type=2))
 
 # learning policy
