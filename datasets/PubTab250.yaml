@@ -1,12 +1,9 @@
-type: PubTabNet
 load:
   parts:
   - jsonl: ~/data/pubtabnet/PubTabNet_2.0.0.jsonl
     image: ~/data/pubtabnet/
 dump:
-  dir: ~/data/mmocr_pubtab250/
-  json: ~/data/ground_truth_pubtab250.json
-  split: val
+  pkl: ~/data/mutab_pubtab250.pkl
 seq_len:
   html:
     min: 250

@@ -1,24 +1,18 @@
 import argparse
 import json
+import pickle
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import partial
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import jsonlines
-import toolz.dicttoolz as dicttool
 from dacite import from_dict
 from more_itertools import take
 from ruamel.yaml import YAML
 from tqdm import tqdm
 
-FTN = "FinTabNet"
-PTN = "PubTabNet"
-
-EASY = "simple"
-HARD = "complex"
+TAB = "\t"
 
 
 @dataclass
@@ -34,9 +28,7 @@ class Load:
 
 @dataclass
 class Dump:
-    dir: str
-    json: str
-    split: str
+    pkl: str
 
 
 @dataclass
@@ -52,22 +44,20 @@ class SeqLen:
 
 
 @dataclass
-class TabNet:
+class Preprocess:
     load: Load
     dump: Dump
-    type: Literal[FTN, PTN]
     replace: Dict[Tuple, str]
-    samples: Optional[int] = None
     seq_len: Optional[SeqLen] = None
 
 
 def options():
     args = argparse.ArgumentParser()
-    args.add_argument("config")
+    args.add_argument("cfg")
     args = args.parse_args()
 
-    with path(args.config).open() as f:
-        return from_dict(TabNet, YAML().load(f))
+    data = YAML().load(path(args.cfg))
+    return from_dict(Preprocess, data)
 
 
 def path(root, *levels):
@@ -95,7 +85,7 @@ def merge_close(tokens):
     return target
 
 
-def empty_cells(params, tokens, cell):
+def format_html(params, tokens, cell):
     source = iter(cell)
     target = list()
 
@@ -104,8 +94,8 @@ def empty_cells(params, tokens, cell):
             cell = next(source)
 
             if not cell.get("bbox"):
-                token = tuple(cell["tokens"])
-                token = params.replace[token]
+                token = tuple(cell.get("tokens"))
+                token = params.replace.get(token)
 
         target.append(token)
 
@@ -121,54 +111,27 @@ def unbold(content, ok: bool):
     def remove(tag):
         return ok or tag not in ("<b>", "</b>")
 
-    return "\t".join(filter(remove, content))
+    return TAB.join(filter(remove, content)).strip().split(TAB)
 
 
-def print_cell(cell, header: bool, f):
+def dump_cell(cell, head: bool, dump: list):
     if bbox := cell.get("bbox"):
-        bbox = ",".join(map(str, map(int, bbox)))
-        text = unbold(cell["tokens"], not header)
-
-    else:
-        bbox = "0,0,0,0"
-        text = "<UKN>"
-
-    print(f"{bbox}<;>{text}", file=f)
+        text = unbold(cell["tokens"], not head)
+        dump.append(dict(bbox=bbox, text=text))
 
 
-def print_item(params, part, split, item, html, cell, f):
+def dump_item(params, part, split, name, html, cell):
     head = index_thead(html)
-    name = path(part.image, split, item.get("filename"))
-    html = empty_cells(params, merge_close(html), cell)
+    name = path(part.image, split, name)
+    html = format_html(params, merge_close(html), cell)
     assert len(cell) == count_cell_tokens(params, html)
 
-    print(name.resolve(), file=f)
-    print(",".join(html), file=f)
+    dump = []
 
-    for n, cell in enumerate(cell):
-        print_cell(cell, n in head, f)
+    for num, cell in enumerate(cell):
+        dump_cell(cell, num in head, dump=dump)
 
-
-def combine_cell(params, html, cell):
-    if params.type == PTN or cell.get("bbox"):
-        cell = "".join(cell.get("tokens", ""))
-        return html.replace("</", f"{cell}</")
-
-    else:
-        return html
-
-
-def combine_html(params, html, cell):
-    source = iter(cell)
-    target = []
-
-    for html in html:
-        if html.endswith("</td>"):
-            html = combine_cell(params, html, next(source))
-
-        target.append(html)
-
-    return "".join(target)
+    return dict(img_path=str(name), html=html, cell=dump)
 
 
 def is_long_sample(params, html, cell):
@@ -189,60 +152,38 @@ def is_long_sample(params, html, cell):
     return ok
 
 
-def open_annon_file(params, split, item):
-    name = Path(item["filename"]).with_suffix(suffix=".txt")
-    return path(params.dump.dir, split, name).open(mode="w")
+def fix_json(text):
+    return text.replace(", ]", "]")
 
 
-def parse(params, part, split, item):
-    html = item["html"]["structure"]["tokens"]
-    cell = item["html"]["cells"]
-    name = item["filename"]
+def parse(params, part, row, splits):
+    name = row["filename"]
+    html = row["html"]["structure"]["tokens"]
+    cell = row["html"]["cells"]
+    page = row["split"]
+
+    item = dict(name=name, html=html, cell=cell)
+    item = dump_item(params, part, page, **item)
 
     if is_long_sample(params, html, cell):
-        with open_annon_file(params, split, item) as f:
-            print_item(params, part, split, item, html, cell, f)
-
-        if split == params.dump.split:
-            lev = (EASY, HARD)[">" in html]
-            txt = combine_html(params, html, cell)
-            return {name: dict(html=txt, type=lev)}
-
-    return {}
+        splits[page].append(item)
 
 
-def jsonl(name):
-    def loads(exp):
-        # remove trailing commas
-        return json.loads(exp.replace(", ]", "]"))
-
-    return jsonlines.open(path(name), loads=loads)
-
-
-def splits(params):
-    splits = defaultdict(list)
-
-    for part in params.load.parts:
-        with jsonl(part.jsonl) as f:
-            for item in tqdm(f, desc=part.jsonl):
-                splits[item["split"]].append((part, item))
-
-    drop = partial(take, params.samples)
-    return dicttool.valmap(drop, splits)
+def jsonl(params, part, splits):
+    with path(part.jsonl).open() as f:
+        for line in tqdm(f, desc=part.jsonl):
+            line = json.loads(fix_json(line))
+            parse(params, part, line, splits)
 
 
 def process(params):
-    test = {}
+    table_splits = defaultdict(list)
 
-    for split, items in splits(params).items():
-        name = path(params.dump.dir, split)
-        name.mkdir(parents=True, exist_ok=True)
+    for part in params.load.parts:
+        jsonl(params, part, table_splits)
 
-        for part, item in tqdm(items, desc=split):
-            test.update(parse(params, part, split, item))
-
-    with path(params.dump.json).open(mode="w") as f:
-        json.dump(test, f)
+    data = pickle.dumps(dict(table_splits))
+    path(params.dump.pkl).write_bytes(data)
 
 
 if __name__ == "__main__":

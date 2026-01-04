@@ -1,12 +1,9 @@
-type: PubTabNet
 load:
   parts:
   - jsonl: ~/data/pubtabnet/PubTabNet_2.0.0.jsonl
     image: ~/data/pubtabnet/
 dump:
-  dir: ~/data/mmocr_pubtabnet/
-  json: ~/data/ground_truth_pubtabnet.json
-  split: val
+  pkl: ~/data/mutab_pubtabnet.pkl
 replace:
   []: "<eb></eb>"
   [' ']: "<eb1></eb1>"

@@ -1,4 +1,3 @@
-type: FinTabNet
 load:
   parts:
   - jsonl: ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_train.jsonl
@@ -8,9 +7,7 @@ load:
   - jsonl: ~/data/fintabnet/img_tables/FinTabNet_1.0.0_table_test.jsonl
     image: ~/data/fintabnet/img_tables/
 dump:
-  dir: ~/data/mmocr_fintabnet/
-  json: ~/data/ground_truth_fintabnet.json
-  split: val
+  pkl: ~/data/mutab_fintabnet.pkl
 replace:
   []: "<eb></eb>"
   [' ']: "<eb></eb>"

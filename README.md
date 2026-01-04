@@ -30,10 +30,8 @@ Run [preprocess.py](preprocess.py) as follows:
 
 ```sh
 $ python preprocess.py datasets/FinTabNet.yaml
-$ python preprocess.py datasets/FinTabSub.yaml
 $ python preprocess.py datasets/PubTab250.yaml
 $ python preprocess.py datasets/PubTabNet.yaml
-$ python preprocess.py datasets/PubTabSub.yaml
 ```
 
 The datasets must be placed in `data` directory as follows:
@@ -49,8 +47,6 @@ fintabnet/
       100003_61626.png
       100004_61627.png
     val/
-ground_truth_fintabnet.json
-ground_truth_pubtabnet.json
 icdar-task-b/
   final_eval/
     000221630ba33f9118f2671a715d6962e08d6b76a5a0c77a9fe26c291df763b0.png
@@ -59,22 +55,9 @@ icdar-task-b/
     002bfeebe20be2e97fab46b99ce68321afb8972f6d8f131f0c1f5392819d3a23.png
     002c7215e95cd4bfebffb13dc0db32ab229a6674f4f1add84518ae52b75ac0da.png
   final_eval.json
-mmocr_fintabnet/
-  train/
-    100000_61623.txt
-    100001_61624.txt
-    100002_61625.txt
-    100003_61626.txt
-    100004_61627.txt
-  val/
-mmocr_pubtabnet/
-  train/
-    PMC1064074_007_00.txt
-    PMC1064076_003_00.txt
-    PMC1064076_004_00.txt
-    PMC1064080_002_00.txt
-    PMC1064094_007_00.txt
-  val/
+mutab_fintabnet.pkl
+mutab_pubtab250.pkl
+mutab_pubtabnet.pkl
 pubtabnet/
   PubTabNet_2.0.0.jsonl
   train/
@@ -85,8 +68,6 @@ pubtabnet/
     PMC1064094_007_00.png
   val/
 ```
-
-The annotation format is fully compatible with [MTL-TabNet](https://github.com/namtuanly/MTL-TabNet).
 
 ### Training
 
