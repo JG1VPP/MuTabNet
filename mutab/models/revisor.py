@@ -2,7 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
-from mutab.models.factory import REVISORS, build_revisor
+from mutab.models.factory import MODELS, build
 from mutab.syntax import otsl_to_html
 
 
@@ -15,10 +15,10 @@ class RevisorModule(ABC):
         return self.process(dict(html=html, cell=cell)).get("html")
 
 
-@REVISORS.register_module()
+@MODELS.register_module()
 class TableRevisor(RevisorModule):
     def __init__(self, pipeline: List[Dict]):
-        self.sub = tuple(map(build_revisor, pipeline))
+        self.sub = tuple(map(build, pipeline))
 
     def process(self, results):
         for sub in self.sub:
@@ -27,7 +27,7 @@ class TableRevisor(RevisorModule):
         return results
 
 
-@REVISORS.register_module()
+@MODELS.register_module()
 class TableCombine(RevisorModule):
     def __init__(self, SOC: List[str], EOC: List[str]):
         assert isinstance(SOC, list)
@@ -72,7 +72,7 @@ class TableCombine(RevisorModule):
         return results
 
 
-@REVISORS.register_module()
+@MODELS.register_module()
 class TableReplace(RevisorModule):
     def __init__(self, replace: Dict[str, str]):
         assert isinstance(replace, dict)
@@ -97,7 +97,7 @@ class TableReplace(RevisorModule):
         return results
 
 
-@REVISORS.register_module()
+@MODELS.register_module()
 class ToHTML(RevisorModule):
     def process(self, results):
         html = results.get("html")

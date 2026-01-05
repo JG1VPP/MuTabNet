@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from rotary_embedding_torch import RotaryEmbedding
 
-from mutab.models.factory import ATTENTIONS, build_attention
+from mutab.models.factory import MODELS, build
 
 
 class Mask(nn.Module):
@@ -47,7 +47,7 @@ class Attention(nn.Module, abc.ABC):
         raise NotImplementedError
 
 
-@ATTENTIONS.register_module()
+@MODELS.register_module()
 class GlobalAttention(Attention):
     def __init__(self, dropout: float, **kwargs):
         super().__init__(**kwargs)
@@ -68,7 +68,7 @@ class GlobalAttention(Attention):
         return self.drop(self.weight(p, q)).matmul(v)
 
 
-@ATTENTIONS.register_module()
+@MODELS.register_module()
 class CausalAttention(GlobalAttention):
     @property
     def causal(self):
@@ -79,7 +79,7 @@ class CausalAttention(GlobalAttention):
         return super().attention(q, k, v=v, mask=mask.tril())
 
 
-@ATTENTIONS.register_module()
+@MODELS.register_module()
 class WindowAttention(GlobalAttention):
     def __init__(self, window: int, **kwargs):
         super().__init__(**kwargs)
@@ -134,7 +134,7 @@ class WindowAttention(GlobalAttention):
         return torch.cat([pad, x], dim=-2)
 
 
-@ATTENTIONS.register_module()
+@MODELS.register_module()
 class AbsentAttention(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
@@ -153,8 +153,8 @@ class FeedForward(nn.Sequential):
 class Block(nn.Module):
     def __init__(self, att1, att2, **kwargs):
         super().__init__()
-        self.att1 = build_attention(att1, **kwargs)
-        self.att2 = build_attention(att2, **kwargs)
+        self.att1 = build(att1, **kwargs)
+        self.att2 = build(att2, **kwargs)
         self.feed = FeedForward(**kwargs)
 
     def forward(self, kwargs):

@@ -8,11 +8,10 @@ from mmcv.image import imread
 from mmcv.runner import BaseModule, auto_fp16
 from mmocr.apis import model_inference
 
-from mutab.models import factory
-from mutab.models.factory import DETECTORS
+from mutab.models.factory import MODELS, build
 
 
-@DETECTORS.register_module()
+@MODELS.register_module()
 class TableScanner(BaseModule):
     def __init__(
         self,
@@ -28,15 +27,15 @@ class TableScanner(BaseModule):
 
         # label handler
         assert handler is not None
-        self.handler = factory.build_handler(handler)
+        self.handler = build(handler)
 
         # backbone
         assert backbone is not None
-        self.backbone = factory.build_backbone(backbone)
+        self.backbone = build(backbone)
 
         # encoder module
         assert encoder is not None
-        self.encoder = factory.build_encoder(encoder)
+        self.encoder = build(encoder)
 
         # decoder module
         assert decoder is not None
@@ -53,14 +52,14 @@ class TableScanner(BaseModule):
         decoder.update(EOS_CELL=self.handler.EOS_CELL)
         decoder.update(SEP_CELL=self.handler.SEP_CELL)
 
-        self.decoder = factory.build_decoder(decoder)
+        self.decoder = build(decoder)
 
         # loss
         assert isinstance(html_loss, list) and len(html_loss)
         assert isinstance(cell_loss, list) and len(cell_loss)
 
-        pad_html = partial(factory.build_loss, ignore=self.handler.PAD_HTML)
-        pad_cell = partial(factory.build_loss, ignore=self.handler.PAD_CELL)
+        pad_html = partial(build, ignore=self.handler.PAD_HTML)
+        pad_cell = partial(build, ignore=self.handler.PAD_CELL)
 
         self.loss = nn.ModuleList()
         self.loss.extend(tuple(map(pad_html, html_loss)))

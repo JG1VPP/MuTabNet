@@ -8,10 +8,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from more_itertools import flatten, split_at
 
-from mutab.models.factory import HANDLERS, build_revisor
+from mutab.models.factory import MODELS, build
 
 
-@HANDLERS.register_module()
+@MODELS.register_module()
 class TableHandler(nn.Module):
     def __init__(
         self,
@@ -49,7 +49,7 @@ class TableHandler(nn.Module):
         self.char2idx_html = defaultdict(lambda: self.UKN_HTML, self.char2idx_html)
         self.char2idx_cell = defaultdict(lambda: self.UKN_CELL, self.char2idx_cell)
 
-        self.revisor = build_revisor(revisor)
+        self.revisor = build(revisor)
 
     def load(self, dict_file: str, enc="utf-8"):
         with open(dict_file, encoding=enc) as f:

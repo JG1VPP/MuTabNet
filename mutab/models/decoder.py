@@ -4,10 +4,10 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from mutab.models.factory import DECODERS, build_network
+from mutab.models.factory import MODELS, build
 
 
-@DECODERS.register_module()
+@MODELS.register_module()
 class TableDecoder(nn.Module):
     def __init__(
         self,
@@ -61,10 +61,10 @@ class TableDecoder(nn.Module):
         cell_decoder.update(d_input=d_model * 2)
 
         # networks
-        self.html = build_network(html_decoder, **kwargs)
-        self.cell = build_network(cell_decoder, **kwargs)
-        self.grid = build_network(html_fetcher, **kwargs)
-        self.bbox = build_network(bbox_locator, **kwargs)
+        self.html = build(html_decoder, **kwargs)
+        self.cell = build(cell_decoder, **kwargs)
+        self.grid = build(html_fetcher, **kwargs)
+        self.bbox = build(bbox_locator, **kwargs)
 
         # LtoR or RtoL
         self.register_buffer("LtoR", torch.eye(2)[0])

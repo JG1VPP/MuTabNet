@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from positional_encodings import torch_encodings as pos
 
 from mutab.models.attention import Blocks, Linear
-from mutab.models.factory import NETWORKS
+from mutab.models.factory import MODELS
 
 
 class Network(nn.Module):
@@ -24,7 +24,7 @@ class Network(nn.Module):
         return torch.stack(tuple(map(move, data, mask)))
 
 
-@NETWORKS.register_module()
+@MODELS.register_module()
 class Fetcher(Network):
     def __init__(self, SOC: int, EOS: int, **kwargs):
         super().__init__()
@@ -58,7 +58,7 @@ class Fetcher(Network):
         return hid, ext
 
 
-@NETWORKS.register_module()
+@MODELS.register_module()
 class Decoder(Network):
     def __init__(
         self,
@@ -180,7 +180,7 @@ class Decoder(Network):
         return ret, mask.any().item()
 
 
-@NETWORKS.register_module()
+@MODELS.register_module()
 class Locator(Network):
     def __init__(self, d_model: int, pass_html: bool, **kwargs):
         super().__init__()

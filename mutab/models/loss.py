@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 
-from mutab.models.factory import LOSSES, build_loss
+from mutab.models.factory import MODELS, build
 
 
 class Loss(nn.Module, ABC):
@@ -31,7 +31,7 @@ class Loss(nn.Module, ABC):
         return {self.label: self.loss(*inputs)}
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class CELoss(Loss):
     label = "loss_ce_{}"
 
@@ -46,7 +46,7 @@ class CELoss(Loss):
         return logit, label
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class KLLoss(Loss):
     label = "loss_kl_{}"
 
@@ -87,7 +87,7 @@ class KLLoss(Loss):
         return {self.label: loss}
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class BBLoss(Loss):
     def build_loss(self, ignore: int, cls: str, **kwargs):
         # key
@@ -137,7 +137,7 @@ class BBLoss(Loss):
         return dict(loss_h=loss_h, loss_v=loss_v)
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class Nested(Loss):
     def build_loss(self, ignore: int, **kwargs):
-        return build_loss(kwargs["loss"])
+        return build(kwargs["loss"])

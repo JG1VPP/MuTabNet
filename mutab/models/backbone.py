@@ -4,8 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mutab.models.factory import BACKBONES, GC_MODULES
-from mutab.models.factory import build_gc_module as build
+from mutab.models.factory import MODELS, build
 
 
 class BN(nn.BatchNorm2d):
@@ -28,7 +27,7 @@ class ConvBnReLU(nn.Sequential):
         super().__init__(ConvBn(d, h, k, mom=mom), nn.ReLU())
 
 
-@GC_MODULES.register_module()
+@MODELS.register_module()
 class GCA(nn.Module):
     def __init__(self, d: int, ratio: float, heads: int):
         super().__init__()
@@ -71,7 +70,7 @@ class ResidualGroup(nn.Sequential):
         self.extend(ResidualBlock(h, h) for _ in range(1, depth))
 
 
-@BACKBONES.register_module()
+@MODELS.register_module()
 class TableResNet(nn.Sequential):
     def __init__(
         self,

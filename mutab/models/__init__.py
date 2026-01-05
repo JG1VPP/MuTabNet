@@ -1,7 +1,7 @@
 from .backbone import TableResNet
 from .decoder import TableDecoder
 from .encoder import TableEncoder
-from .factory import build_detector
+from .factory import build
 from .handler import TableHandler
 from .loss import BBLoss, CELoss, KLLoss, Nested
 from .network import Decoder, Fetcher, Locator
@@ -22,5 +22,5 @@ __all__ = [
     "TableResNet",
     "TableRevisor",
     "TableScanner",
-    "build_detector",
+    "build",
 ]
