@@ -111,7 +111,7 @@ class TableScanner(BaseModule):
     def forward_train(self, image, img_metas):
         targets = self.handler.forward(img_metas, device=image.device)
         outputs = self.decoder(self.encoder(self.backbone(image)), **targets)
-        return ChainMap(*[f(outputs, targets, img_metas) for f in self.loss])
+        return ChainMap(*tuple(loss(outputs, targets) for loss in self.loss))
 
     def forward_test(self, image, img_metas):
         return self.simple_test(image, img_metas)
