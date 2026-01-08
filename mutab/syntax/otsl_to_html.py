@@ -1,5 +1,6 @@
 import re
 from itertools import takewhile, zip_longest
+from pathlib import Path
 from typing import List
 
 from more_itertools import ilen, split_after, transpose
@@ -127,10 +128,8 @@ def otsl_to_html(otsl: List[str]):
 if __name__ == "__main__":
     import json
 
-    with open("sample_html.json") as fp:
-        html = json.load(fp)
-    with open("sample_otsl.json") as fp:
-        otsl = json.load(fp)
+    html = json.loads(Path("sample_html.json").read_text())
+    otsl = json.loads(Path("sample_otsl.json").read_text())
 
     for html, otsl in zip(html, otsl):
         assert otsl_to_html(otsl) == tuple(html)

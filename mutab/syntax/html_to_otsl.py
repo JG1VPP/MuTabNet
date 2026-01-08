@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass, field
 from itertools import product
+from pathlib import Path
 from typing import List, Tuple
 
 from more_itertools import transpose
@@ -79,17 +80,17 @@ def td(tag, row, end, seq, box):
     row.append(Cell("D", bbox=Bbox(*box)))
 
 
-@parser("<(eb\d*)>")
+@parser(r"<(eb\d*)>")
 def eb(tag, row, end, seq, box):
     row.append(Cell(tag.group(1), bbox=Bbox(*box)))
 
 
-@parser('colspan="(\d+)"')
+@parser(r'colspan="(\d+)"')
 def cs(tag, row, end, seq, box):
     row[-1].span.cols = int(tag.group(1))
 
 
-@parser('rowspan="(\d+)"')
+@parser(r'rowspan="(\d+)"')
 def rs(tag, row, end, seq, box):
     row[-1].span.rows = int(tag.group(1))
 
@@ -184,10 +185,8 @@ if __name__ == "__main__":
     import json
     from itertools import repeat
 
-    with open("sample_html.json") as fp:
-        html = json.load(fp)
-    with open("sample_otsl.json") as fp:
-        otsl = json.load(fp)
+    html = json.loads(Path("sample_html.json").read_text())
+    otsl = json.loads(Path("sample_otsl.json").read_text())
 
     # dummy cell bounding boxes
     bbox = repeat((0, 0, 0, 0))
