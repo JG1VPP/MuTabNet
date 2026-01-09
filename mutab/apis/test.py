@@ -8,7 +8,7 @@ from mmdet.apis import init_detector
 from more_itertools import flatten, transpose
 from tqdm import tqdm
 
-from mutab.metrics import TEDS
+from mutab.score import TEDS
 
 
 def test(item, truth, ignore: Optional[List[str]]):

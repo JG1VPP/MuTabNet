@@ -8,7 +8,7 @@ from mmcv.image import imread
 from mmcv.runner import BaseModule, auto_fp16
 from mmocr.apis import model_inference
 
-from mutab.models.factory import MODELS, build
+from mutab.model.factory import MODELS, build
 
 
 @MODELS.register_module()

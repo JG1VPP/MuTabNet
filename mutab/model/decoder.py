@@ -4,7 +4,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from mutab.models.factory import MODELS, build
+from mutab.model.factory import MODELS, build
 
 
 @MODELS.register_module()

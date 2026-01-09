@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 
-from mutab.models.factory import MODELS, build
+from mutab.model.factory import MODELS, build
 
 
 class Loss(nn.Module, ABC):

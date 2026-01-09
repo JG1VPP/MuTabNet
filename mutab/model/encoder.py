@@ -1,8 +1,8 @@
 import torch.nn as nn
 from positional_encodings import torch_encodings as pos
 
-from mutab.models.attention import Blocks
-from mutab.models.factory import MODELS
+from mutab.block import Blocks
+from mutab.model.factory import MODELS
 
 
 @MODELS.register_module()

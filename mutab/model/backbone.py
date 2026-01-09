@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mutab.models.factory import MODELS, build
+from mutab.model.factory import MODELS, build
 
 
 class BN(nn.BatchNorm2d):

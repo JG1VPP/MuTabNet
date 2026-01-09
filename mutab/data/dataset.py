@@ -2,7 +2,7 @@ import numpy as np
 from mmdet.datasets.builder import DATASETS
 from mmocr.datasets import BaseDataset
 
-from mutab.metrics import TEDS
+from mutab.score import TEDS
 from mutab.utils import get_logger
 
 

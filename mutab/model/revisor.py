@@ -2,8 +2,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
-from mutab.models.factory import MODELS, build
-from mutab.syntax import otsl_to_html
+from mutab.model.factory import MODELS, build
+from mutab.table import otsl_to_html
 
 
 class RevisorModule(ABC):

@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from more_itertools import flatten, split_at
 
-from mutab.models.factory import MODELS, build
+from mutab.model.factory import MODELS, build
 
 
 @MODELS.register_module()

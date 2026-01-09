@@ -8,8 +8,8 @@ from mmdet.apis import train_detector
 from mmdet.utils import get_device
 
 from mutab import utils
-from mutab.datasets import build_dataset
-from mutab.models import build
+from mutab.data import build_dataset
+from mutab.model import build_detector
 
 
 def train(cfg: Config, cfg_file: str):
@@ -29,7 +29,7 @@ def train(cfg: Config, cfg_file: str):
     log.info("\n{}".format(cfg.pretty_text))
 
     # build model and dataset
-    model = build(cfg.model)
+    model = build_detector(cfg.model)
     dataset = build_dataset(cfg.data.train)
 
     # dump configuration

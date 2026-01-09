@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from mmdet.datasets.builder import PIPELINES
 
-from mutab.syntax import html_to_otsl
+from mutab.table import html_to_otsl
 
 
 @PIPELINES.register_module()

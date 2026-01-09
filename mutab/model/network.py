@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from positional_encodings import torch_encodings as pos
 
-from mutab.models.attention import Blocks, Linear
-from mutab.models.factory import MODELS
+from mutab.block import Blocks, Linear
+from mutab.model.factory import MODELS
 
 
 class Network(nn.Module):
