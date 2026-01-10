@@ -3,8 +3,8 @@ _base_ = "pubtabnet.py"
 
 model = dict(
     handler=dict(
-        html_dict_file="alphabet/fintabnet/structure_alphabet.txt",
-        cell_dict_file="alphabet/fintabnet/character_alphabet.txt",
+        html_dict=dict(load="alphabet/fintabnet/structure_alphabet.txt"),
+        cell_dict=dict(load="alphabet/fintabnet/character_alphabet.txt"),
     )
 )
 

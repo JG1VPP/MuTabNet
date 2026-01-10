@@ -30,8 +30,8 @@ class Fetcher(Network):
         super().__init__()
 
         # special tokens
-        self.register_buffer("SOC", torch.tensor(SOC))
-        self.register_buffer("EOS", torch.tensor(EOS))
+        self.register_buffer("SOC", torch.as_tensor(SOC))
+        self.register_buffer("EOS", torch.as_tensor(EOS))
 
         # blocks
         self.md = Blocks(**kwargs)
@@ -73,9 +73,9 @@ class Decoder(Network):
         super().__init__()
 
         # special tokens
-        self.register_buffer("SOS", torch.tensor(SOS))
-        self.register_buffer("EOS", torch.tensor(EOS))
-        self.register_buffer("SEP", torch.tensor(SEP))
+        self.register_buffer("SOS", torch.as_tensor(SOS))
+        self.register_buffer("EOS", torch.as_tensor(EOS))
+        self.register_buffer("SEP", torch.as_tensor(SEP))
 
         # embedding
         self.emb = nn.Embedding(num_emb, d_model, max_norm=1)

@@ -3,6 +3,7 @@ from .decoder import TableDecoder
 from .encoder import TableEncoder
 from .factory import build as build_detector
 from .handler import TableHandler
+from .lexicon import TableLexicon
 from .network import Decoder, Fetcher, Locator
 from .revisor import TableRevisor
 from .scanner import TableScanner
@@ -14,6 +15,7 @@ __all__ = [
     "TableDecoder",
     "TableEncoder",
     "TableHandler",
+    "TableLexicon",
     "TableResNet",
     "TableRevisor",
     "TableScanner",

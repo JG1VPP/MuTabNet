@@ -39,18 +39,18 @@ class TableScanner(BaseModule):
 
         # decoder module
         assert decoder is not None
-        decoder.update(num_emb_html=self.handler.num_class_html)
-        decoder.update(num_emb_cell=self.handler.num_class_cell)
+        decoder.update(num_emb_html=self.handler.html.num_class)
+        decoder.update(num_emb_cell=self.handler.cell.num_class)
 
         # special tokens (html)
         decoder.update(SOC_HTML=self.handler.SOC_HTML)
-        decoder.update(SOS_HTML=self.handler.SOS_HTML)
-        decoder.update(EOS_HTML=self.handler.EOS_HTML)
+        decoder.update(SOS_HTML=self.handler.html.SOS)
+        decoder.update(EOS_HTML=self.handler.html.EOS)
 
         # special tokens (cell)
-        decoder.update(SOS_CELL=self.handler.SOS_CELL)
-        decoder.update(EOS_CELL=self.handler.EOS_CELL)
-        decoder.update(SEP_CELL=self.handler.SEP_CELL)
+        decoder.update(SOS_CELL=self.handler.cell.SOS)
+        decoder.update(EOS_CELL=self.handler.cell.EOS)
+        decoder.update(SEP_CELL=self.handler.cell.SEP)
 
         self.decoder = build(decoder)
 
@@ -58,8 +58,8 @@ class TableScanner(BaseModule):
         assert isinstance(html_loss, list) and len(html_loss)
         assert isinstance(cell_loss, list) and len(cell_loss)
 
-        pad_html = partial(build, ignore=self.handler.PAD_HTML)
-        pad_cell = partial(build, ignore=self.handler.PAD_CELL)
+        pad_html = partial(build, ignore=self.handler.html.PAD.item())
+        pad_cell = partial(build, ignore=self.handler.cell.PAD.item())
 
         self.loss = nn.ModuleList()
         self.loss.extend(tuple(map(pad_html, html_loss)))
@@ -109,7 +109,7 @@ class TableScanner(BaseModule):
         return dict(loss=loss, log_vars=logs)
 
     def forward_train(self, image, img_metas):
-        targets = self.handler.forward(img_metas, device=image.device)
+        targets = self.handler(img_metas, train=True)
         outputs = self.decoder(self.encoder(self.backbone(image)), **targets)
         return ChainMap(*tuple(loss(outputs, targets) for loss in self.loss))
 

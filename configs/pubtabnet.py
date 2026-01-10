@@ -97,9 +97,15 @@ model = dict(
     ],
     handler=dict(
         type="TableHandler",
-        html_dict_file="alphabet/pubtabnet/structure_alphabet.txt",
-        cell_dict_file="alphabet/pubtabnet/character_alphabet.txt",
-        SOC=["D"],
+        html_dict=dict(
+            type="TableLexicon",
+            load="alphabet/pubtabnet/structure_alphabet.txt",
+        ),
+        cell_dict=dict(
+            type="TableLexicon",
+            load="alphabet/pubtabnet/character_alphabet.txt",
+        ),
+        SOC="D",
         revisor=dict(
             type="TableRevisor",
             pipeline=[
