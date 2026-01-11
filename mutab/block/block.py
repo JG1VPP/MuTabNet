@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from rotary_embedding_torch import RotaryEmbedding
 
-from mutab.model.factory import MODELS, build
+from mutab.utils import MODELS, build
 
 
 class Mask(nn.Module):

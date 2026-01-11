@@ -1,19 +1,20 @@
-import numpy as np
-from mmdet.datasets.builder import DATASETS
-from mmocr.datasets import BaseDataset
+from pathlib import Path
+from typing import List
 
-from mutab.score import TEDS
-from mutab.utils import get_logger
+from mmengine.dataset import BaseDataset
+from mmengine.fileio import load
+from mmengine.registry import DATASETS
 
 
 @DATASETS.register_module()
 class TableDataset(BaseDataset):
-    def evaluate(self, results, **kwargs):
-        scores = []
-        logger = get_logger()
-        for idx, table in enumerate(self.data_infos):
-            score = TEDS(struct_only=False).evaluate(**results[idx])
-            logger.info("TEDS: %.3f (%s)", score, table["filename"])
-            scores.append(score)
+    @property
+    def split(self):
+        return self.filter_cfg.get("split")
 
-        return dict(TEDS=np.mean(scores))
+    def load_data_list(self) -> List[dict]:
+        # load preprocessed pickle
+        path = Path(self.ann_file).expanduser()
+        data = load(path, file_format="pickle")
+
+        return list(data[self.split])

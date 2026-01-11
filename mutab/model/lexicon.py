@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from more_itertools import collapse, split_at
 
-from mutab.model.factory import MODELS
+from mutab.utils import MODELS
 
 
 @MODELS.register_module()

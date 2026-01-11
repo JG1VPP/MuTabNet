@@ -1,4 +1,8 @@
 _base_ = "pubtabnet.py"
 
 
-data = dict(train=dict(ann_file="../data/mmocr_pubtab250/train/"))
+train_dataloader = dict(dataset=dict(ann_file="~/data/mutab_pubtab250.pkl"))
+
+val_dataloader = dict(dataset=dict(ann_file="~/data/mutab_pubtab250.pkl"))
+
+test_dataloader = dict(dataset=dict(ann_file="~/data/mutab_pubtab250.pkl"))

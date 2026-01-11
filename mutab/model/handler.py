@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from more_itertools import transpose
 
-from mutab.model.factory import MODELS, build
+from mutab.utils import MODELS, build
 
 
 @MODELS.register_module()
@@ -14,6 +14,8 @@ class TableHandler(nn.Module):
         cell_dict: dict,
         SOC: str,
         revisor: dict,
+        outputs: list[str],
+        targets: list[str],
     ):
         super().__init__()
 
@@ -29,6 +31,12 @@ class TableHandler(nn.Module):
 
         self.revisor = build(revisor)
 
+        assert isinstance(outputs, list)
+        assert isinstance(targets, list)
+
+        self.outputs = outputs
+        self.targets = targets
+
     @property
     def SOC_HTML(self):
         token = self.SOC
@@ -38,33 +46,39 @@ class TableHandler(nn.Module):
 
         return token
 
-    def forward(self, img_metas, train: bool):
+    def forward(self, img, targets, train: bool):
         if train:
-            return self._train(img_metas)
+            return self._train(img, targets)
         else:
-            return self._valid(img_metas)
+            return self._valid(img, targets)
 
-    def reverse(self, img_metas, **items):
+    def reverse(self, targets, **items):
         outputs = []
 
         for item in transpose(items.values()):
             outputs.append(dict(zip(items.keys(), item)))
 
-        return tuple(map(self.itemize, outputs, img_metas))
+        return tuple(map(self.itemize, outputs, targets))
 
     def itemize(self, outputs, targets):
+        targets = targets.to_dict()
+
         # decode
         outputs.update(bbox=self.decode_bbox(**outputs))
         outputs.update(html=self.decode_html(**outputs))
         outputs.update(cell=self.decode_cell(**outputs))
 
         # revise
-        outputs.update(real=self.revisor(**targets))
-        outputs.update(pred=self.revisor(**outputs))
+        targets.update(full=self.revisor(**targets))
+        outputs.update(full=self.revisor(**outputs))
 
-        return dict(outputs)
+        # labels
+        outputs = {k: outputs.get(k) for k in self.outputs}
+        targets = {k: targets.get(k) for k in self.targets}
 
-    def _train(self, batch):
+        return dict(outputs=outputs, targets=targets)
+
+    def _train(self, img, batch):
         html = self.tensor("html", batch, self.encode_html)
         cell = self.tensor("cell", batch, self.encode_cell)
         bbox = self.tensor("bbox", batch, self.encode_bbox)
@@ -73,7 +87,7 @@ class TableHandler(nn.Module):
         bbox = F.pad(bbox, pad=(1, 1)).mT
 
         # batch
-        item = dict(targets=batch)
+        item = dict(targets=batch, img=torch.stack(img))
 
         # tasks
         item.update(html=html)
@@ -83,9 +97,9 @@ class TableHandler(nn.Module):
 
         return item
 
-    def _valid(self, batch):
+    def _valid(self, img, batch):
         # batch
-        return dict(targets=batch)
+        return dict(targets=batch, img=torch.stack(img))
 
     def tensor(self, key, batch, op):
         data = op(m.get(key) for m in batch)

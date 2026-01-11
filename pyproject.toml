@@ -6,21 +6,17 @@ dependencies = [
   "dacite",
   "distance",
   "lxml",
-  "mmcv-full<2",
-  "mmdet<3",
-  "mmocr<1",
+  "mmcv",
+  "mmengine",
   "more-itertools",
-  "numpy",
   "positional-encodings[pytorch]",
   "rotary-embedding-torch",
   "ruamel-yaml",
   "tqdm",
-  "urllib3<2",
-  "yapf==0.40.1",
 ]
 
 [build-system]
-requires = ["setuptools", "torch>=2,<2.1"]
+requires = ["setuptools", "torch>=2.4"]
 
 [tool.setuptools.packages.find]
 include = ["mutab"]

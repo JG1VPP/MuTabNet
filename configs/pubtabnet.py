@@ -1,7 +1,14 @@
+custom_imports = dict(
+    imports=[
+        "mutab.data",
+        "mutab.loss",
+        "mutab.model",
+        "mutab.score",
+    ]
+)
+
 max_len_html = 800
 max_len_cell = 8000
-
-seed = None
 
 eb_tokens = {
     "<eb></eb>": "<td></td>",
@@ -17,24 +24,22 @@ eb_tokens = {
     "<eb10></eb10>": "<td><b> \u2028 \u2028 </b></td>",
 }
 
-cell_tokens = ["<td></td>", "<td", *eb_tokens]
-
 gca = ["GCA"]
 gcb = dict(ratio=0.0625, heads=1)
 
 model = dict(
     type="TableScanner",
-    backbone=dict(
-        type="TableResNet",
-        dim=3,
-        out=512,
-        gcb1=dict(depth=1, **gcb),
-        gcb2=dict(depth=2, **gcb, gca=gca),
-        gcb3=dict(depth=5, **gcb, gca=gca),
-        gcb4=dict(depth=3, **gcb, gca=gca),
-    ),
     encoder=dict(
         type="TableEncoder",
+        backbone=dict(
+            type="TableResNet",
+            dim=3,
+            out=512,
+            gcb1=dict(depth=1, **gcb),
+            gcb2=dict(depth=2, **gcb, gca=gca),
+            gcb3=dict(depth=5, **gcb, gca=gca),
+            gcb4=dict(depth=3, **gcb, gca=gca),
+        ),
         blocks=[],
         heads=8,
         d_model=512,
@@ -136,144 +141,154 @@ model = dict(
                 ),
             ],
         ),
-    ),
-)
-
-train_pipeline = [
-    dict(type="LoadImageFromFile"),
-    dict(type="TableResize", size=520),
-    dict(
-        type="TablePad",
-        size=(520, 520),
-    ),
-    dict(type="TableBboxEncode"),
-    dict(type="ToOTSL"),
-    dict(type="ToTensorOCR"),
-    dict(
-        type="NormalizeOCR",
-        mean=[0.5, 0.5, 0.5],
-        std=[0.5, 0.5, 0.5],
-    ),
-    dict(
-        type="Collect",
-        keys=["img"],
-        meta_keys=[
-            "filename",
-            "ori_shape",
-            "img_shape",
-            "pad_shape",
-            "img_scale",
-            "rows",
-            "cols",
+        outputs=[
             "html",
             "cell",
             "bbox",
+            "full",
+        ],
+        targets=[
+            "html",
+            "cell",
+            "bbox",
+            "full",
+            "pad_shape",
+            "scale_factor",
         ],
     ),
-]
+)
 
-test_pipeline = [
+pipeline = [
+    dict(type="FillBbox", cell=["<td></td>", "<td"]),
     dict(type="LoadImageFromFile"),
-    dict(type="TableResize", size=520),
+    dict(type="Resize", scale=520, keep_ratio=True),
+    dict(type="Pad", size=(520, 520)),
+    dict(type="FormBbox"),
+    dict(type="Hardness"),
+    dict(type="ToOTSL"),
     dict(
-        type="TablePad",
-        size=(520, 520),
+        type="Normalize",
+        mean=[128, 128, 128],
+        std=[128, 128, 128],
     ),
-    dict(type="ToTensorOCR"),
+    dict(type="ImageToTensor", keys=["img"]),
     dict(
-        type="NormalizeOCR",
-        mean=[0.5, 0.5, 0.5],
-        std=[0.5, 0.5, 0.5],
-    ),
-    dict(
-        type="Collect",
+        type="Annotate",
         keys=["img"],
-        meta_keys=[
-            "filename",
+        meta=[
+            "img_path",
             "ori_shape",
             "img_shape",
             "pad_shape",
-            "img_scale",
+            "scale_factor",
+            "html",
+            "cell",
+            "bbox",
+            "type",
         ],
     ),
 ]
 
-loader = dict(
-    type="TableHardDiskLoader",
-    parser=dict(
-        type="TableStrParser",
-        cell_tokens=cell_tokens,
-        empty_bbox=(0, 0, 0, 0),
+train_dataloader = dict(
+    batch_size=2,
+    num_workers=0,
+    sampler=dict(
+        type="DefaultSampler",
+        shuffle=True,
     ),
-)
-
-data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=2,
-    train=dict(
+    dataset=dict(
         type="TableDataset",
-        img_prefix="../data/pubtabnet/train/",
-        ann_file="../data/mmocr_pubtabnet/train/",
-        pipeline=train_pipeline,
-        loader=loader,
+        ann_file="~/data/mutab_pubtabnet.pkl",
+        filter_cfg=dict(split="train"),
+        pipeline=pipeline,
         test_mode=False,
     ),
-    val=dict(
-        type="TableDataset",
-        img_prefix="../data/pubtabnet/val/",
-        ann_file="../data/mmocr_pubtabsub/val/",
-        pipeline=train_pipeline,
-        loader=loader,
-        test_mode=True,
+)
+
+val_dataloader = dict(
+    batch_size=2,
+    num_workers=0,
+    sampler=dict(
+        type="DefaultSampler",
+        shuffle=False,
     ),
-    test=dict(
+    dataset=dict(
         type="TableDataset",
-        img_prefix="../data/pubtabnet/val/",
-        ann_file="../data/mmocr_pubtabsub/val/",
-        pipeline=test_pipeline,
-        loader=loader,
+        ann_file="~/data/mutab_pubtabnet.pkl",
+        filter_cfg=dict(split="val"),
+        indices=range(24),
+        pipeline=pipeline,
         test_mode=True,
     ),
 )
 
-# optimizer
-optimizer = dict(type="AdamW", lr=1e-3)
-optimizer_config = dict(grad_clip=dict(max_norm=30, norm_type=2))
-
-# learning policy
-lr_config = dict(
-    policy="step",
-    warmup="linear",
-    warmup_iters=50,
-    warmup_ratio=1.0 / 3,
-    step=[25, 28],
+test_dataloader = dict(
+    batch_size=2,
+    num_workers=0,
+    sampler=dict(
+        type="DefaultSampler",
+        shuffle=False,
+    ),
+    dataset=dict(
+        type="TableDataset",
+        ann_file="~/data/mutab_pubtabnet.pkl",
+        filter_cfg=dict(split="val"),
+        pipeline=pipeline,
+        test_mode=True,
+    ),
 )
 
-# runner
-runner = dict(type="EpochBasedRunner", max_epochs=30)
+train_cfg = dict(
+    type="EpochBasedTrainLoop",
+    max_epochs=30,
+)
 
-# evaluation
-ignore = None
-evaluation = dict(interval=1, metric="acc")
+val_cfg = dict(type="ValLoop")
 
-# fp16
-fp16 = dict(loss_scale="dynamic")
+test_cfg = dict(type="TestLoop")
 
-# checkpoint setting
-checkpoint_config = dict(interval=1)
+optim_wrapper = dict(
+    type="OptimWrapper",
+    optimizer=dict(
+        type="AdamW",
+        lr=1e-3,
+        betas=(0.9, 0.999),
+        weight_decay=0.001,
+    ),
+    clip_grad=dict(
+        max_norm=10,
+        norm_type=2,
+    ),
+)
 
-# log_config
-log_config = dict(interval=100, hooks=[dict(type="TextLoggerHook")])
+param_scheduler = [
+    dict(
+        type="LinearLR",
+        start_factor=0.2,
+        begin=0,
+        end=100,
+        by_epoch=False,
+    ),
+    dict(
+        type="MultiStepLR",
+        milestones=[25],
+        gamma=0.1,
+        by_epoch=True,
+    ),
+]
 
-# logger
-log_level = "INFO"
+val_evaluator = dict(
+    type="TEDS",
+    prefix="full",
+    ignore=None,
+    struct=False,
+)
 
-# yapf:enable
-dist_params = dict(backend="nccl")
+test_evaluator = dict(
+    type="TEDS",
+    prefix="full",
+    ignore=None,
+    struct=False,
+)
 
-# pretrained
-load_from = None
-resume_from = None
-
-# workflow
-workflow = [("train", 1)]
+launcher = "pytorch"

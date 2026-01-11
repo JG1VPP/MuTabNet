@@ -8,53 +8,59 @@ model = dict(
     )
 )
 
-train_pipeline = [
+pipeline = [
+    dict(type="FillBbox", cell=["<td></td>", "<td"]),
     dict(type="LoadImageFromFile"),
-    dict(type="TableResize", size=520),
-    dict(
-        type="TablePad",
-        size=(520, 520),
-    ),
-    dict(type="TableBboxFlip"),
-    dict(type="TableBboxEncode"),
+    dict(type="Resize", scale=520, keep_ratio=True),
+    dict(type="Pad", size=(520, 520)),
+    dict(type="FillBbox"),
+    dict(type="FormBbox"),
+    dict(type="FlipBbox"),
+    dict(type="Hardness"),
     dict(type="ToOTSL"),
-    dict(type="ToTensorOCR"),
     dict(
-        type="NormalizeOCR",
-        mean=[0.5, 0.5, 0.5],
-        std=[0.5, 0.5, 0.5],
+        type="Normalize",
+        mean=[128, 128, 128],
+        std=[128, 128, 128],
     ),
+    dict(type="ImageToTensor", keys=["img"]),
     dict(
-        type="Collect",
+        type="Annotate",
         keys=["img"],
-        meta_keys=[
-            "filename",
+        meta=[
+            "img_path",
             "ori_shape",
             "img_shape",
             "pad_shape",
-            "img_scale",
-            "rows",
-            "cols",
+            "scale_factor",
             "html",
             "cell",
             "bbox",
+            "type",
         ],
     ),
 ]
 
-data = dict(
-    train=dict(
-        img_prefix="../data/fintabnet/img_tables/train/",
-        ann_file="../data/mmocr_fintabnet/train/",
-        pipeline=train_pipeline,
+train_dataloader = dict(
+    dataset=dict(
+        ann_file="~/data/mutab_fintabnet.pkl",
+        filter_cfg=dict(split="train"),
+        pipeline=pipeline,
     ),
-    val=dict(
-        img_prefix="../data/fintabnet/img_tables/test/",
-        ann_file="../data/mmocr_fintabsub/test/",
-        pipeline=train_pipeline,
+)
+
+val_dataloader = dict(
+    dataset=dict(
+        ann_file="~/data/mutab_fintabnet.pkl",
+        filter_cfg=dict(split="test"),
+        pipeline=pipeline,
     ),
-    test=dict(
-        img_prefix="../data/fintabnet/img_tables/val/",
-        ann_file="../data/mmocr_fintabsub/val/",
+)
+
+test_dataloader = dict(
+    dataset=dict(
+        ann_file="~/data/mutab_fintabnet.pkl",
+        filter_cfg=dict(split="val"),
+        pipeline=pipeline,
     ),
 )
