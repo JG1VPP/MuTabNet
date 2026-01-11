@@ -6,7 +6,7 @@ End-to-End table OCR model using a hierarchical Transformer that outputs HTML ta
 
 ### Install
 
-Install [PyTorch](https://pytorch.org) 2.0 and run the following command:
+Install [PyTorch](https://pytorch.org) 2.4+ and run the following command:
 
 ```sh
 pip install -e .
@@ -68,6 +68,24 @@ pubtabnet/
     PMC1064094_007_00.png
   val/
 ```
+
+### Training
+
+Run [train.py](train.py) to start training using four GPUs:
+
+```sh
+torchrun --nproc-per-node=4 train.py configs/pubtabnet.py --work-dir ~/work
+```
+
+### Evaluation
+
+Run [infer.py](infer.py) to evaluate the model and calculate TEDS score:
+
+```sh
+python3 infer.py --config configs/pubtabnet.py --weight ~/work/epoch_30.pth --split val --store results.pkl
+```
+
+For FinTabNet, we use validation set including 10,656 tables as test set in imitation of the previous work.
 
 ## Requirements
 
