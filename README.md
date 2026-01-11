@@ -69,30 +69,6 @@ pubtabnet/
   val/
 ```
 
-### Training
-
-Run [train.py](train.py) to start training using four GPUs:
-
-```sh
-name=pubtab250
-save=~/work/$name
-
-CUDA_VISIBLE_DEVICES=0,1,2,3 PORT=29500 ./train.sh ./configs/$name.py $save 4
-```
-
-### Evaluation
-
-Run [test.py](test.py) to evaluate the model and calculate TEDS score:
-
-```sh
-path=~/data/icdar-task-b/final_eval
-json=~/data/icdar-task-b/final_eval.json
-
-python test.py --conf ./configs/$name.py --ckpt $save/latest.pth --path $path --json $json
-```
-
-For FinTabNet, we use validation set including 10,656 tables as test set in imitation of the previous work.
-
 ## Requirements
 
 We recommend that you use at least four NVIDIA V100 32GB GPUs.

@@ -4,9 +4,7 @@ from time import perf_counter_ns
 
 import torch.distributed as dist
 import torch.nn as nn
-from mmcv.image import imread
 from mmcv.runner import BaseModule, auto_fp16
-from mmocr.apis import model_inference
 
 from mutab.model.factory import MODELS, build
 
@@ -120,6 +118,3 @@ class TableScanner(BaseModule):
         time = perf_counter_ns()
         item = self.decoder.predict(self.encoder(self.backbone(image)), time)
         return tuple(self.handler.reverse(**item, img_metas=list(img_metas)))
-
-    def predict(self, path: str):
-        return dict(path=path, **model_inference(self, imread(path)))
