@@ -1,19 +1,17 @@
 from collections import ChainMap
 from functools import partial
-from time import perf_counter_ns
 
-import torch.distributed as dist
+import torch
 import torch.nn as nn
-from mmcv.runner import BaseModule, auto_fp16
+from mmengine.model import BaseModel
 
-from mutab.model.factory import MODELS, build
+from mutab.utils import MODELS, build
 
 
 @MODELS.register_module()
-class TableScanner(BaseModule):
+class TableScanner(BaseModel):
     def __init__(
         self,
-        backbone,
         encoder,
         decoder,
         handler,
@@ -23,20 +21,13 @@ class TableScanner(BaseModule):
     ):
         super().__init__()
 
-        # label handler
-        assert handler is not None
+        # handler module
         self.handler = build(handler)
 
-        # backbone
-        assert backbone is not None
-        self.backbone = build(backbone)
-
         # encoder module
-        assert encoder is not None
         self.encoder = build(encoder)
 
         # decoder module
-        assert decoder is not None
         decoder.update(num_emb_html=self.handler.html.num_class)
         decoder.update(num_emb_cell=self.handler.cell.num_class)
 
@@ -59,62 +50,33 @@ class TableScanner(BaseModule):
         pad_html = partial(build, ignore=self.handler.html.PAD.item())
         pad_cell = partial(build, ignore=self.handler.cell.PAD.item())
 
-        self.loss = nn.ModuleList()
-        self.loss.extend(tuple(map(pad_html, html_loss)))
-        self.loss.extend(tuple(map(pad_cell, cell_loss)))
-
-        self.init_weights()
-
-    @property
-    def is_init(self):
-        return True
+        self.losses = nn.ModuleList()
+        self.losses.extend(tuple(map(pad_html, html_loss)))
+        self.losses.extend(tuple(map(pad_cell, cell_loss)))
 
     def init_weights(self):
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+        pass
 
-    @auto_fp16(apply_to=["img"])
-    def forward(self, img, img_metas, return_loss=True, **kwargs):
-        if return_loss:
-            return self.forward_train(img, img_metas)
-        elif isinstance(img_metas[0], list):
-            return self.forward_test(img, img_metas[0])
-        else:
-            return self.forward_test(img, img_metas)
+    def forward(self, mode: str, **kwargs):
+        if mode == "loss":
+            return self._train(**kwargs)
 
-    def train_step(self, data, optimizer):
-        loss = self.parse_losses(self(**data))
-        loss.update(num_samples=len(data["img_metas"]))
-        return loss
+        with torch.no_grad():
+            return self._valid(**kwargs)
 
-    def val_step(self, data, optimizer):
-        loss = self.parse_losses(self(**data))
-        loss.update(num_samples=len(data["img_metas"]))
-        return loss
+    def _train(self, **targets):
+        targets = self.handler(**targets, train=True)
+        outputs = self.encoder(**targets, train=True)
+        outputs = self.decoder(**outputs, train=True)
 
-    def parse_losses(self, losses):
-        logs = dict({k: v.mean() for k, v in losses.items()})
-        loss = sum(v for k, v in logs.items() if "loss" in k)
-        logs.update(loss=loss)
-        for key, value in logs.items():
-            # reduce loss when distributed training
-            if dist.is_available() and dist.is_initialized():
-                value = value.data.clone()
-                world = int(dist.get_world_size())
-                dist.all_reduce(value.div_(world))
-            logs[key] = value.item()
-        return dict(loss=loss, log_vars=logs)
+        return self.loss(outputs, targets)
 
-    def forward_train(self, image, img_metas):
-        targets = self.handler(img_metas, train=True)
-        outputs = self.decoder(self.encoder(self.backbone(image)), **targets)
-        return ChainMap(*tuple(loss(outputs, targets) for loss in self.loss))
+    def _valid(self, **targets):
+        outputs = self.handler(**targets, train=False)
+        outputs = self.encoder(**outputs, train=False)
+        outputs = self.decoder(**outputs, train=False)
 
-    def forward_test(self, image, img_metas):
-        return self.simple_test(image, img_metas)
+        return self.handler.reverse(**outputs, **targets)
 
-    def simple_test(self, image, img_metas):
-        time = perf_counter_ns()
-        item = self.decoder.predict(self.encoder(self.backbone(image)), time)
-        return tuple(self.handler.reverse(**item, img_metas=list(img_metas)))
+    def loss(self, outputs, targets):
+        return ChainMap(*[f(outputs, targets) for f in self.losses])

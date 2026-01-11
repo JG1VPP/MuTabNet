@@ -1,10 +1,9 @@
-from time import perf_counter_ns
 from typing import List
 
 import torch
 import torch.nn as nn
 
-from mutab.model.factory import MODELS, build
+from mutab.utils import MODELS, build
 
 
 @MODELS.register_module()
@@ -70,7 +69,13 @@ class TableDecoder(nn.Module):
         self.register_buffer("LtoR", torch.eye(2)[0])
         self.register_buffer("RtoL", torch.eye(2)[1])
 
-    def forward(self, img, html, back, cell, **kwargs):
+    def forward(self, train: bool, **kwargs):
+        if train:
+            return self._train(**kwargs, train=train)
+        else:
+            return self._valid(**kwargs, train=train)
+
+    def _train(self, img, html, back, cell, **kwargs):
         # ground truth
         html = html.to(img.device)
         back = back.to(img.device)
@@ -106,22 +111,18 @@ class TableDecoder(nn.Module):
             bbox=o_bbox,
         )
 
-    def predict(self, img, time: int):
+    def _valid(self, img, **kwargs):
         # LtoR
         h_LtoR = self.LtoR.expand(len(img), 1, 2)
 
         # structure prediction
         h_html, o_html = self.html.predict(img, h_LtoR)
-        t_html = perf_counter_ns()
 
         # structure refinement
         h_html, h_grid = self.grid(img, h_html, o_html)
         h_grid, o_bbox = self.bbox(img, h_html, h_grid)
-        t_bbox = perf_counter_ns()
 
         # character prediction
         h_cell, o_cell = self.cell.predict(img, h_grid)
-        t_cell = perf_counter_ns()
 
-        time = dict(init=time, html=t_html, bbox=t_bbox, cell=t_cell)
-        return dict(html=o_html, cell=o_cell, bbox=o_bbox, time=time)
+        return dict(html=o_html, cell=o_cell, bbox=o_bbox)

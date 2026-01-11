@@ -1,112 +1,101 @@
-import cv2
+from abc import ABC, abstractmethod
+from typing import Sequence
+
 import numpy as np
-from mmdet.datasets.builder import PIPELINES
+from mmcv.transforms import BaseTransform
+from mmengine import TRANSFORMS
+from mmengine.structures import BaseDataElement
 
 from mutab.table import html_to_otsl
 
-
-@PIPELINES.register_module()
-class TableResize:
-    def __init__(self, size: int):
-        self.size = size
-
-    def __call__(self, results):
-        self.resize_img(results)
-        self.resize_box(results)
-        return results
-
-    def resize_img(self, results):
-        image = results["img"]
-        h, w, _ = image.shape
-        if w < h:
-            w = int(self.size / h * w)
-            h = int(self.size)
-        else:
-            h = int(self.size / w * h)
-            w = int(self.size)
-        scale = (h / image.shape[0], w / image.shape[1])
-        image = cv2.resize(image, (w, h), interpolation=cv2.INTER_LINEAR)
-        results.update(img=image, img_shape=image.shape, img_scale=scale)
-
-    def resize_box(self, results):
-        h, w = results["img_shape"][:2]
-        info = results.get("img_info")
-        # train and val phase
-        if info is not None and info.get("bbox") is not None:
-            bbox = info["bbox"]
-            y, x = results["img_scale"]
-            bbox[..., 0::2] = np.clip(bbox[..., 0::2] * x, 0, w - 1)
-            bbox[..., 1::2] = np.clip(bbox[..., 1::2] * y, 0, h - 1)
-            info.update(bbox=bbox)
+EASY = "simple"
+HARD = "complex"
 
 
-@PIPELINES.register_module()
-class TablePad:
-    def __init__(self, size):
-        self.size = size[::-1]
+class TableTransform(ABC, BaseTransform):
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
 
-    def __call__(self, results):
-        img = self.extend(results["img"], self.size)
-        results.update(img=img, pad_shape=img.shape)
-        return results
+    def transform(self, results):
+        return results | self.progress(**results)
 
-    def extend(self, img, size):
-        h = (0, size[0] - img.shape[0])
-        w = (0, size[1] - img.shape[1])
-        pad = np.pad(img, (h, w, (0, 0)))
-        return pad.astype(img.dtype)
+    @abstractmethod
+    def progress(self, **kwargs) -> dict:
+        raise NotImplementedError
 
 
-@PIPELINES.register_module()
-class TableBboxFlip:
-    def __call__(self, results):
-        h, _, _ = results["img_shape"]
-        bbox = results["img_info"].get("bbox", results.get("bbox"))
-        mask = np.count_nonzero(bbox, axis=-1, keepdims=True)
-        flip = np.where(mask, h - 1 - bbox, bbox).clip(min=0)
-        np.copyto(bbox[..., 1], flip[..., 1])
-        np.copyto(bbox[..., 3], flip[..., 3])
-        return results
+@TRANSFORMS.register_module()
+class Annotate(BaseTransform):
+    def __init__(self, *, keys, meta):
+        super().__init__()
+
+        assert isinstance(keys, Sequence)
+        assert isinstance(meta, Sequence)
+
+        self.keys = keys
+        self.meta = meta
+
+    def transform(self, results):
+        # collect inputs
+        data = {k: results[k] for k in self.keys}
+        meta = {k: results[k] for k in self.meta}
+
+        # create element
+        meta = BaseDataElement(metainfo=meta)
+
+        return dict(data, targets=meta)
 
 
-@PIPELINES.register_module()
-class TableBboxEncode:
-    def __call__(self, results):
-        info = results["img_info"]
-        size = results["img"].shape
-        bbox = self.xyxy_to_xywh(info["bbox"])
-        bbox = self.normalize_bbox(bbox, size)
-        assert np.all(bbox >= 0)
-        assert np.all(bbox <= 1)
-        info.update(bbox=bbox)
-        self.adjust_key(results)
-        return results
+@TRANSFORMS.register_module()
+class FillBbox(TableTransform):
+    def __init__(self, cell: list[str], **kwargs):
+        super().__init__()
 
-    def xyxy_to_xywh(self, bbox):
-        bb = np.empty_like(bbox)
-        # xy center
-        bb[..., 0] = bbox[..., 0::2].mean(axis=-1)
-        bb[..., 1] = bbox[..., 1::2].mean(axis=-1)
-        # width and height
-        bb[..., 2] = bbox[..., 0::2].ptp(axis=-1)
-        bb[..., 3] = bbox[..., 1::2].ptp(axis=-1)
-        return bb
+        self.cell = cell
 
-    def normalize_bbox(self, bbox, size):
-        bbox[..., 0::2] /= size[1]
-        bbox[..., 1::2] /= size[0]
-        return bbox
+    def progress(self, html, cell, **kwargs):
+        html_bbox = np.zeros((len(html), 4))
 
-    def adjust_key(self, results):
-        results.update(html=results["img_info"].pop("html"))
-        results.update(cell=results["img_info"].pop("cell"))
-        results.update(bbox=results["img_info"].pop("bbox"))
+        list_cell = list(v["text"] for v in cell)
+        iter_bbox = iter(v["bbox"] for v in cell)
+
+        for idx, cell in enumerate(html):
+            if cell in self.cell:
+                html_bbox[idx] = next(iter_bbox)
+
+        return dict(cell=list_cell, gt_bboxes=html_bbox)
 
 
-@PIPELINES.register_module()
-class ToOTSL:
-    def __call__(self, results):
-        otsl, bbox, _, n = html_to_otsl(**results)
-        results.update(html=otsl, bbox=np.stack(bbox))
-        results.update(rows=otsl[::n], cols=otsl[:n:])
-        return results
+@TRANSFORMS.register_module()
+class FormBbox(TableTransform):
+    def progress(self, img_shape, gt_bboxes, **kwargs):
+        img_h, img_w = img_shape
+
+        # lurd format
+        l = gt_bboxes[..., 0] / img_w
+        u = gt_bboxes[..., 1] / img_h
+        r = gt_bboxes[..., 2] / img_w
+        d = gt_bboxes[..., 3] / img_h
+
+        # xywh format
+        x = (l + r) / 2
+        y = (u + d) / 2
+        w = abs(r - l)
+        h = abs(d - u)
+
+        # must be ndarray
+        bbox = np.stack([x, y, w, h], axis=-1)
+        return dict(bbox=bbox, gt_bboxes=bbox)
+
+
+@TRANSFORMS.register_module()
+class Hardness(TableTransform):
+    def progress(self, html, **kwargs):
+        return dict(type=(EASY, HARD)[">" in html])
+
+
+@TRANSFORMS.register_module()
+class ToOTSL(TableTransform):
+    def progress(self, html, bbox, **kwargs):
+        otsl, bbox, _, _ = html_to_otsl(html, bbox)
+        return dict(html=otsl, bbox=np.stack(bbox))

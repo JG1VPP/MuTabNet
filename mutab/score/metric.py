@@ -1,7 +1,12 @@
+from operator import itemgetter
+from statistics import mean
+
 import distance
 from apted import APTED, Config
 from apted.helpers import Tree
 from lxml import etree, html
+from mmengine.evaluator import BaseMetric
+from mmengine.registry import METRICS
 from tqdm import tqdm
 
 
@@ -33,25 +38,48 @@ class Custom(Config):
         return 0.0
 
 
-class TEDS:
-    def __init__(self, ignore_tags=None, struct_only=False):
-        self.ignore_tags = ignore_tags or []
-        self.struct_only = struct_only
+@METRICS.register_module()
+class TEDS(BaseMetric):
+    OUTPUTS = "outputs"
+    TARGETS = "targets"
 
-    def evaluate(self, pred, real, **kwargs):
+    def __init__(self, ignore=None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.ignore = ignore or []
+
+    def process(self, data_batch, data_samples):
+        self.results.extend(map(self._teds, data_samples))
+
+    def compute_metrics(self, results: list):
+        html = mean(map(itemgetter("html"), results))
+        full = mean(map(itemgetter("full"), results))
+
+        return dict(html=html, full=full)
+
+    def _teds(self, result):
+        y = result[self.OUTPUTS][self.prefix]
+        t = result[self.TARGETS][self.prefix]
+
+        html = self.score(y, t, struct=True)
+        full = self.score(y, t, struct=False)
+
+        return dict(html=html, full=full)
+
+    def score(self, pred, real, struct=False, **kwargs):
         parser = html.HTMLParser(encoding="utf-8")
 
         pred = self.extract_table(pred, parser=parser)
         real = self.extract_table(real, parser=parser)
 
-        etree.strip_tags(pred, *self.ignore_tags)
-        etree.strip_tags(real, *self.ignore_tags)
+        etree.strip_tags(pred, *self.ignore)
+        etree.strip_tags(real, *self.ignore)
 
         num_tags_pred = len(pred.xpath(".//*"))
         num_tags_real = len(real.xpath(".//*"))
 
-        pred = self.html_to_tree(pred)
-        real = self.html_to_tree(real)
+        pred = self.html_to_tree(pred, struct=struct)
+        real = self.html_to_tree(real, struct=struct)
 
         result = APTED(pred, real, Custom()).compute_edit_distance()
         return 1 - float(result) / max(num_tags_pred, num_tags_real)
@@ -65,11 +93,11 @@ class TEDS:
         else:
             return next(iter(tables))
 
-    def html_to_tree(self, node, parent=None):
+    def html_to_tree(self, node, struct: bool, parent=None):
         col = int(node.attrib.get("colspan", 1))
         row = int(node.attrib.get("rowspan", 1))
 
-        if node.tag == "td" and not self.struct_only:
+        if node.tag == "td" and not struct:
             sub = self.tokenize(node)[1:-1]
         else:
             sub = []
@@ -81,7 +109,7 @@ class TEDS:
 
         if node.tag != "td":
             for n in node.getchildren():
-                self.html_to_tree(n, sub)
+                self.html_to_tree(n, struct, sub)
 
         return sub
 
@@ -115,4 +143,4 @@ if __name__ == "__main__":
         real = real_json[key]["html"]
         test = test_json[key]
 
-        assert test == TEDS().evaluate(pred, real)
+        assert test == TEDS(prefix="html").score(pred, real)

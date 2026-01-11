@@ -1,5 +1,4 @@
-from mmcv.utils import build_from_cfg
-from mmdet.models.builder import MODELS
+from mmengine import MODELS, build_from_cfg
 
 
 def build(cfg, registry=MODELS, **kwargs):

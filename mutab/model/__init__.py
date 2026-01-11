@@ -1,7 +1,6 @@
 from .backbone import TableResNet
 from .decoder import TableDecoder
 from .encoder import TableEncoder
-from .factory import build as build_detector
 from .handler import TableHandler
 from .lexicon import TableLexicon
 from .network import Decoder, Fetcher, Locator
@@ -19,5 +18,4 @@ __all__ = [
     "TableResNet",
     "TableRevisor",
     "TableScanner",
-    "build_detector",
 ]
