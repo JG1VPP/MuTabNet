@@ -83,7 +83,7 @@ model = dict(
                 ),
             ],
         ),
-        bbox_locator=dict(type="TableCellLocator", pass_html=True),
+        bbox_locator=dict(type="TableCellLocator"),
         heads=8,
         window=300,
         d_model=512,
@@ -97,6 +97,7 @@ model = dict(
         dict(type="KLLoss", key="html", rev="back"),
         dict(type="KLLoss", key="back", rev="html"),
         dict(type="BBLoss", key="bbox", cls="html"),
+        dict(type="BBLoss", key="zone", cls="html"),
     ],
     cell_loss=[
         dict(type="CELoss", key="cell"),

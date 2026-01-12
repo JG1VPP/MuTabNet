@@ -5,21 +5,12 @@ from mutab.utils import MODELS
 
 
 @MODELS.register_module()
-class TableCellLocator(nn.Module):
-    def __init__(self, d_model: int, pass_html: bool, **kwargs):
-        super().__init__()
+class TableCellLocator(Linear):
+    def __init__(self, d_model: int, **kwargs):
+        super().__init__(d_model, 4, act=nn.Sigmoid)
 
-        # embeddings
-        self.pos = Linear(d_model, 4, act=nn.Sigmoid)
-        self.emb = Linear(4, d_model, act=nn.Sigmoid)
+    def forward(self, img, hid1, hid2):
+        box1 = super().forward(hid1)
+        box2 = super().forward(hid2)
 
-        self.pass_html = int(pass_html)
-
-    def forward(self, img, html, grid):
-        plus = self.emb(self.pos(grid))
-        grid = grid.mul(self.pass_html)
-
-        grid = grid.add(plus)
-        bbox = self.pos(html)
-
-        return grid, bbox
+        return box1, box2

@@ -94,6 +94,7 @@ class TableHandler(nn.Module):
         item.update(back=html.fliplr())
         item.update(cell=cell)
         item.update(bbox=bbox)
+        item.update(zone=bbox)
 
         return item
 
