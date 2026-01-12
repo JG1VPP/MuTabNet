@@ -3,6 +3,7 @@ custom_imports = dict(
         "mutab.data",
         "mutab.loss",
         "mutab.model",
+        "mutab.phase",
         "mutab.score",
     ]
 )
@@ -48,7 +49,7 @@ model = dict(
     decoder=dict(
         type="TableDecoder",
         html_decoder=dict(
-            type="Decoder",
+            type="TableCellDecoder",
             blocks=[
                 dict(
                     att1=dict(type="WindowAttention"),
@@ -65,7 +66,7 @@ model = dict(
             ],
         ),
         cell_decoder=dict(
-            type="Decoder",
+            type="TableCellDecoder",
             blocks=[
                 dict(
                     att1=dict(type="WindowAttention"),
@@ -74,7 +75,7 @@ model = dict(
             ],
         ),
         html_fetcher=dict(
-            type="Fetcher",
+            type="TableCellFetcher",
             blocks=[
                 dict(
                     att1=dict(type="GlobalAttention"),
@@ -82,7 +83,7 @@ model = dict(
                 ),
             ],
         ),
-        bbox_locator=dict(type="Locator", pass_html=True),
+        bbox_locator=dict(type="TableCellLocator", pass_html=True),
         heads=8,
         window=300,
         d_model=512,
