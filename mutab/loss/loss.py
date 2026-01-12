@@ -44,6 +44,7 @@ class CELoss(Loss):
         # targets [N, L]
         logit = outputs[self.key].mT
         label = targets[self.key][:, 1:]
+
         return logit, label
 
 
@@ -85,6 +86,7 @@ class KLLoss(Loss):
     def forward(self, outputs, targets):
         qp, denom = self.format(outputs, targets)
         loss = self.loss(*qp).div(denom.clamp(1))
+
         return {self.label: loss}
 
 
@@ -99,7 +101,7 @@ class BBLoss(Loss):
         self.register_buffer("PAD", pad)
 
         # MAE
-        return nn.L1Loss(reduction="sum")
+        return nn.L1Loss()
 
     def format(self, outputs, targets):
         # outputs [N, L, 4]
@@ -108,34 +110,14 @@ class BBLoss(Loss):
         # targets [N, L, 4]
         bbox = targets[self.key][:, 1:]
 
-        # structural tokens
-        text = targets[self.cls][:, 1:]
-
         # detect PAD
-        mask = text.ne(self.PAD).unsqueeze(2)
-
-        assert pred.ndim == 3
-        assert bbox.ndim == 3
-        assert mask.ndim == 3
+        mask = targets[self.cls][:, 1:].ne(self.PAD)
 
         # remove PAD
-        pred = pred.masked_select(mask)
-        bbox = bbox.masked_select(mask)
+        pred = pred.masked_select(mask.unsqueeze(2))
+        bbox = bbox.masked_select(mask.unsqueeze(2))
 
-        assert pred.ndim == 1
-        assert bbox.ndim == 1
-
-        # samples
-        pair_h = pred[0::2], bbox[0::2]
-        pair_v = pred[1::2], bbox[1::2]
-
-        return pair_h, pair_v, mask
-
-    def forward(self, outputs, targets):
-        pair_h, pair_v, mask = self.format(outputs, targets)
-        loss_h = self.loss(*pair_h).div(mask.sum().clamp(1))
-        loss_v = self.loss(*pair_v).div(mask.sum().clamp(1))
-        return dict(loss_h=loss_h, loss_v=loss_v)
+        return pred, bbox
 
 
 @MODELS.register_module()
