@@ -10,56 +10,8 @@ from mutab.block import Blocks, Linear
 from mutab.utils import MODELS
 
 
-class Network(nn.Module):
-    def predict(self, *args, **kwargs):
-        *hid, cls = self(*args, **kwargs)
-        return (*hid, cls.argmax(dim=-1))
-
-    def extract(self, data, mask, pad: int = 0):
-        def move(item, mask):
-            pad = (0, 0, 0, size - sum(mask))
-            return F.pad(item[mask], pad=pad)
-
-        size = mask.count_nonzero(dim=-1).add(pad).max()
-        return torch.stack(tuple(map(move, data, mask)))
-
-
 @MODELS.register_module()
-class Fetcher(Network):
-    def __init__(self, SOC: int, EOS: int, **kwargs):
-        super().__init__()
-
-        # special tokens
-        self.register_buffer("SOC", torch.as_tensor(SOC))
-        self.register_buffer("EOS", torch.as_tensor(EOS))
-
-        # blocks
-        self.md = Blocks(**kwargs)
-
-    def forward(self, img, hid, seq):
-        assert hid.ndim == 3
-        assert seq.ndim == 2
-
-        # detect full cells
-        soc = torch.isin(seq, self.SOC).unsqueeze(2)
-        eos = torch.isin(seq, self.EOS).unsqueeze(2)
-
-        # mask excess cells
-        soc.logical_and_(eos.cumsum(dim=1).logical_not())
-
-        # remove pad tokens
-        ext = self.extract(hid, mask=soc.squeeze(2))
-        run = self.extract(soc, mask=soc.squeeze(2))
-
-        # perform inference
-        ext = self.md(x=ext, y=img, mask=run.unsqueeze(1).mT)
-        hid = hid.masked_scatter(soc, ext.masked_select(run))
-
-        return hid, ext
-
-
-@MODELS.register_module()
-class Decoder(Network):
+class TableCellDecoder(nn.Module):
     def __init__(
         self,
         d_input: int,
@@ -142,10 +94,10 @@ class Decoder(Network):
         while yet and seq.size(1) <= self.MAX:
             seq, yet = self.enlarge(img, seq, aux)
 
-        return super().predict(img, seq, aux)
+        return self.resolve(img, seq, aux)
 
     def enlarge(self, img, seq, aux):
-        hid, out = super().predict(img, seq, aux)
+        hid, out = self.resolve(img, seq, aux)
 
         # detect new tokens
         mask = seq.roll(-1, 1).eq(self.SEP)
@@ -179,18 +131,6 @@ class Decoder(Network):
 
         return ret, mask.any().item()
 
-
-@MODELS.register_module()
-class Locator(Network):
-    def __init__(self, d_model: int, pass_html: bool, **kwargs):
-        super().__init__()
-        self.pos = Linear(d_model, 4, act=nn.Sigmoid)
-        self.emb = Linear(4, d_model, act=nn.Sigmoid)
-        self.pass_html = int(pass_html)
-
-    def forward(self, img, html, grid):
-        plus = self.emb(self.pos(grid))
-        grid = grid.mul(self.pass_html)
-        grid = grid.add(plus)
-        bbox = self.pos(html)
-        return grid, bbox
+    def resolve(self, *args, **kwargs):
+        *hid, cls = self(*args, **kwargs)
+        return (*hid, cls.argmax(dim=-1))
