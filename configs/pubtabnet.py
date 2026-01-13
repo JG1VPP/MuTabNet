@@ -252,10 +252,8 @@ test_cfg = dict(type="TestLoop")
 optim_wrapper = dict(
     type="OptimWrapper",
     optimizer=dict(
-        type="AdamW",
+        type="Ranger",
         lr=1e-3,
-        betas=(0.9, 0.999),
-        weight_decay=0.001,
     ),
     clip_grad=dict(
         max_norm=10,

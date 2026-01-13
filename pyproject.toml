@@ -10,6 +10,7 @@ dependencies = [
   "mmengine",
   "more-itertools",
   "positional-encodings[pytorch]",
+  "ranger@git+https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer",
   "rotary-embedding-torch",
   "ruamel-yaml",
   "tqdm",
