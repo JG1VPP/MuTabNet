@@ -30,7 +30,6 @@ Run [preprocess.py](preprocess.py) as follows:
 
 ```sh
 $ python preprocess.py datasets/FinTabNet.yaml
-$ python preprocess.py datasets/PubTab250.yaml
 $ python preprocess.py datasets/PubTabNet.yaml
 ```
 
@@ -56,7 +55,6 @@ icdar-task-b/
     002c7215e95cd4bfebffb13dc0db32ab229a6674f4f1add84518ae52b75ac0da.png
   final_eval.json
 mutab_fintabnet.pkl
-mutab_pubtab250.pkl
 mutab_pubtabnet.pkl
 pubtabnet/
   PubTabNet_2.0.0.jsonl
