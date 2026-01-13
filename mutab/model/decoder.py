@@ -98,8 +98,8 @@ class TableDecoder(nn.Module):
         h_back, o_back = self.html(img, e_back, h_RtoL)
 
         # structure refinement
-        h_html, h_grid = self.grid(img, h_html, e_html)
-        h_grid, o_bbox = self.bbox(img, h_html, h_grid)
+        h_bbox, h_grid = self.grid(img, h_html, e_html)
+        o_bbox, o_zone = self.bbox(img, h_bbox, h_html)
 
         # character prediction
         h_cell, o_cell = self.cell(img, s_cell, h_grid)
@@ -109,6 +109,7 @@ class TableDecoder(nn.Module):
             back=o_back,
             cell=o_cell,
             bbox=o_bbox,
+            zone=o_zone,
         )
 
     def _valid(self, img, **kwargs):
@@ -119,8 +120,8 @@ class TableDecoder(nn.Module):
         h_html, o_html = self.html.predict(img, h_LtoR)
 
         # structure refinement
-        h_html, h_grid = self.grid(img, h_html, o_html)
-        h_grid, o_bbox = self.bbox(img, h_html, h_grid)
+        h_bbox, h_grid = self.grid(img, h_html, o_html)
+        o_bbox, o_zone = self.bbox(img, h_bbox, h_html)
 
         # character prediction
         h_cell, o_cell = self.cell.predict(img, h_grid)
