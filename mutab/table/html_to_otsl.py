@@ -80,7 +80,7 @@ def td(tag, row, end, seq, box):
     row.append(Cell("D", bbox=Bbox(*box)))
 
 
-@parser(r"<(eb\d*)>")
+@parser(r"<(eb\d*)")
 def eb(tag, row, end, seq, box):
     row.append(Cell(tag.group(1), bbox=Bbox(*box)))
 

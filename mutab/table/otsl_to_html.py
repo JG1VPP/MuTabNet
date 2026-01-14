@@ -48,14 +48,13 @@ def parser(pattern: str):
     return lambda p: PARSERS.update({pattern: p})
 
 
-@parser("D")
-def td(cell, y: int, x: int, rows, cols, html, full):
+def span(tag, y: int, x: int, rows, cols, html, full):
     rs = ilen(takewhile(is_expand_row, cols[x][y + 1 :]))
     cs = ilen(takewhile(is_expand_col, rows[y][x + 1 :]))
     td = []
 
     # create <TD>
-    td.append("<td")
+    td.append(f"<{tag}")
     td.append(f' colspan="{cs + 1}"' if cs else None)
     td.append(f' rowspan="{rs + 1}"' if rs else None)
     td.append(">")
@@ -68,9 +67,14 @@ def td(cell, y: int, x: int, rows, cols, html, full):
         html.append("".join(td))
 
 
-@parser("eb")
+@parser("D")
+def td(cell, y: int, x: int, rows, cols, html, full):
+    span("td", y, x, rows, cols, html, full)
+
+
+@parser(r"eb\d*")
 def eb(cell, y: int, x: int, rows, cols, html, full):
-    html.append("<{eb}></{eb}>".format(eb=cell.group()))
+    span(cell.group(), y, x, rows, cols, html, full)
 
 
 @parser("R")
@@ -105,7 +109,8 @@ def bd(cell, y: int, x: int, rows, cols, html, full):
 def parse_cell(y: int, x: int, rows, cols, html, full):
     for pattern, p in PARSERS.items():
         if m := re.search(pattern, rows[y][x]):
-            return p(m, y, x, rows, cols, html, full)
+            p(m, y, x, rows, cols, html, full)
+            break
 
 
 def otsl_to_html(otsl: List[str]):
