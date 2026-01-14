@@ -11,6 +11,9 @@ custom_imports = dict(
 max_len_html = 800
 max_len_cell = 8000
 
+look_around_rows = 3
+look_around_cols = 3
+
 eb_tokens = {
     "<eb( [^>]*)?>": "<td\\1>",
     "<eb1( [^>]*)?>": "<td\\1> ",
@@ -90,6 +93,7 @@ model = dict(
         dropout=0.2,
         max_len_html=max_len_html,
         max_len_cell=max_len_cell,
+        num_box=look_around_rows * look_around_cols,
     ),
     html_loss=[
         dict(type="CELoss", key="html"),
@@ -169,7 +173,13 @@ pipeline = [
     dict(type="Pad", size=(520, 520)),
     dict(type="FormBbox"),
     dict(type="Hardness"),
+    dict(type="ToGrid"),
     dict(type="ToOTSL"),
+    dict(
+        type="RollBbox",
+        row=look_around_rows,
+        col=look_around_cols,
+    ),
     dict(
         type="Normalize",
         mean=[128, 128, 128],

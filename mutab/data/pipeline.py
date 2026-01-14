@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from functools import partial
+from itertools import product, starmap
 from typing import Sequence
 
 import numpy as np
@@ -92,6 +94,43 @@ class FormBbox(TableTransform):
 class Hardness(TableTransform):
     def progress(self, html, **kwargs):
         return dict(type=(EASY, HARD)[">" in html])
+
+
+@TRANSFORMS.register_module()
+class RollBbox(TableTransform):
+    def __init__(self, *, row: int, col: int):
+        super().__init__()
+
+        assert isinstance(row, int)
+        assert isinstance(col, int)
+
+        assert row >= 1
+        assert col >= 1
+
+        self.rows = range(row)
+        self.cols = range(col)
+
+    def progress(self, bbox, rows, cols, **kwargs):
+        bbox = bbox.reshape((rows, cols, 4))
+
+        roll = partial(self.roll, bbox=bbox)
+        size = product(self.rows, self.cols)
+
+        bbox = tuple(starmap(roll, size))
+        return dict(bbox=np.hstack(bbox))
+
+    def roll(self, v: int, h: int, bbox):
+        bbox = np.roll(bbox, shift=-v, axis=0)
+        bbox = np.roll(bbox, shift=-h, axis=1)
+
+        return np.vstack(bbox)
+
+
+@TRANSFORMS.register_module()
+class ToGrid(TableTransform):
+    def progress(self, html, bbox, **kwargs):
+        _, _, rows, cols = html_to_otsl(html, bbox)
+        return dict(rows=int(rows), cols=int(cols))
 
 
 @TRANSFORMS.register_module()
