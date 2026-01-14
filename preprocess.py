@@ -5,14 +5,16 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from dacite import from_dict
-from more_itertools import take
+from more_itertools import ilen, iter_index, take
 from ruamel.yaml import YAML
 from tqdm import tqdm
 
 TAB = "\t"
+
+BOLD = "<b>"
+DLOB = "</b>"
 
 
 @dataclass
@@ -23,7 +25,7 @@ class Part:
 
 @dataclass
 class Load:
-    parts: List[Part]
+    parts: list[Part]
 
 
 @dataclass
@@ -38,7 +40,7 @@ class Range:
 
 
 @dataclass
-class SeqLen:
+class Length:
     html: Range = field(default_factory=Range)
     cell: Range = field(default_factory=Range)
 
@@ -47,8 +49,7 @@ class SeqLen:
 class Preprocess:
     load: Load
     dump: Dump
-    replace: Dict[Tuple, str]
-    seq_len: Optional[SeqLen] = None
+    replace: dict[tuple, str]
 
 
 def options():
@@ -65,91 +66,62 @@ def path(root, *levels):
     return path.expanduser().absolute()
 
 
-def index_thead(tokens):
-    if "<thead>" in tokens:
-        thead = take(tokens.index("</thead>"), tokens)
-        return list(range(list(thead).count("</td>")))
+def count_head(html):
+    size = next(iter_index(html, "</thead>"), 0)
+    head = iter_index(take(size, html), "</td>")
 
-    else:
-        return range(0)
+    return ilen(head)
 
 
-def merge_close(tokens):
-    source = iter(tokens)
-    target = list()
+def tokenize(params, tokens):
+    html = iter(tokens)
+    half = list()
 
-    for token in source:
-        close = take(token == "<td>", source)
-        target.append(token + "".join(close))
+    for tag in html:
+        close = take(tag == "<td>", html)
+        half.append(tag + "".join(close))
 
-    return target
-
-
-def format_html(params, tokens, cell):
-    source = iter(cell)
-    target = list()
-
-    for token in tokens:
-        if token.startswith("<td"):
-            cell = next(source)
-
-            if not cell.get("bbox"):
-                token = tuple(cell.get("tokens"))
-                token = params.replace.get(token)
-
-        target.append(token)
-
-    return target
+    return half
 
 
-def count_cell_tokens(params, tokens):
-    targets = ["<td", "<td></td>", *params.replace.values()]
-    return sum(map(lambda tag: int(tag in targets), tokens))
+def classify(params, tokens, grid):
+    grid = iter(grid)
+    html = list()
+
+    for tag in tokens:
+        if tag.startswith("<td"):
+            if not (cell := next(grid)).get("bbox"):
+                value = tuple(cell.get("tokens"))
+                value = params.replace.get(value)
+                tag = tag.replace("td", value, 1)
+
+        html.append(tag)
+
+    return html
 
 
-def unbold(content, ok: bool):
-    def remove(tag):
-        return ok or tag not in ("<b>", "</b>")
+def unbold(tokens, is_head_cell: bool):
+    if is_head_cell:
+        tokens = filter(BOLD.__ne__, tokens)
+        tokens = filter(DLOB.__ne__, tokens)
 
-    return TAB.join(filter(remove, content)).strip().split(TAB)
-
-
-def dump_cell(cell, head: bool, dump: list):
-    if bbox := cell.get("bbox"):
-        text = unbold(cell["tokens"], not head)
-        dump.append(dict(bbox=bbox, text=text))
+    return TAB.join(tokens).strip().split(TAB)
 
 
-def dump_item(params, part, split, name, html, cell):
-    head = index_thead(html)
-    name = path(part.image, split, name)
-    html = format_html(params, merge_close(html), cell)
-    assert len(cell) == count_cell_tokens(params, html)
-
+def dump_item(params, part, split, name, html, grid):
+    name = str(path(part.image, split, name))
+    head = count_head(html)
     dump = []
 
-    for num, cell in enumerate(cell):
-        dump_cell(cell, num in head, dump=dump)
+    for n, cell in enumerate(grid):
+        if bbox := cell.get("bbox"):
+            text = unbold(cell["tokens"], n < head)
+            dump.append(dict(bbox=bbox, text=text))
 
-    return dict(img_path=str(name), html=html, cell=dump)
+    html = classify(params, tokenize(params, html), grid)
+    assert len(dump) == sum("<td" in tag for tag in html)
 
-
-def is_long_sample(params, html, cell):
-    ok = True
-
-    if params.seq_len is not None:
-        # length limit of html tokens
-        hmin = params.seq_len.html.min
-        hmax = params.seq_len.html.max
-
-        # length limit of cell tokens
-        cmin = params.seq_len.cell.min
-        cmax = params.seq_len.cell.max
-
-        ok = ok and (hmin <= len(html) <= hmax)
-        ok = ok and (cmin <= len(cell) <= cmax)
-
-    return ok
+    return dict(img_path=name, html=html, cell=dump)
 
 
 def fix_json(text):
@@ -159,14 +131,13 @@ def fix_json(text):
 def parse(params, part, row, splits):
     name = row["filename"]
     html = row["html"]["structure"]["tokens"]
-    cell = row["html"]["cells"]
+    grid = row["html"]["cells"]
     page = row["split"]
 
-    item = dict(name=name, html=html, cell=cell)
+    item = dict(name=name, html=html, grid=grid)
     item = dump_item(params, part, page, **item)
 
-    if is_long_sample(params, html, cell):
-        splits[page].append(item)
+    splits[page].append(item)
 
 
 def jsonl(params, part, splits):
