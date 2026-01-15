@@ -22,6 +22,7 @@ Download the following datasets:
 
 - [FinTabNet](https://developer.ibm.com/data/fintabnet)
 - [PubTabNet](https://github.com/ibm-aur-nlp/PubTabNet)
+- [SynthTabNet](https://github.com/IBM/SynthTabNet)
 - [ICDAR Task-B Test Data](https://github.com/ajjimeno/icdar-task-b)
 
 ### Preprocess
@@ -32,6 +33,7 @@ Run [preprocess.py](preprocess.py) as follows:
 $ python preprocess.py datasets/FinTabNet.yaml
 $ python preprocess.py datasets/PubTab250.yaml
 $ python preprocess.py datasets/PubTabNet.yaml
+$ python preprocess.py datasets/SynTabNet.yaml
 ```
 
 The datasets must be placed in `data` directory as follows:

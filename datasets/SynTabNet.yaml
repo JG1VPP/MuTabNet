@@ -1,0 +1,14 @@
+load:
+  parts:
+  - jsonl: ~/data/synthtabnet/fintabnet/synthetic_data.jsonl
+    image: ~/data/synthtabnet/fintabnet/images/
+  - jsonl: ~/data/synthtabnet/marketing/synthetic_data.jsonl
+    image: ~/data/synthtabnet/marketing/images/
+  - jsonl: ~/data/synthtabnet/pubtabnet/synthetic_data.jsonl
+    image: ~/data/synthtabnet/pubtabnet/images/
+  - jsonl: ~/data/synthtabnet/sparse/synthetic_data.jsonl
+    image: ~/data/synthtabnet/sparse/images/
+dump:
+  pkl: ~/data/mutab_syntabnet.pkl
+replace:
+  []: "<eb></eb>"
