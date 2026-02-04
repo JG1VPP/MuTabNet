@@ -1,10 +1,10 @@
 import argparse
+from multiprocessing import Pool
 from pathlib import Path
 from pickle import dumps
 
 from mmengine import Config
 from mmengine.device import get_device
-from mmengine.evaluator import Evaluator
 from mmengine.runner import Runner, load_checkpoint
 from more_itertools import flatten
 from tqdm import tqdm
@@ -27,15 +27,18 @@ def options():
 def conduct(model, loader: dict, split: str):
     loader.dataset.filter_cfg.update(split=split)
 
-    metric = Evaluator(TEDS(prefix="full"))
+    pool = Pool()
+    model = model.eval()
+    metric = TEDS(prefix="full")
 
     loader = tqdm(Runner.build_dataloader(loader))
     result = flatten(map(model.test_step, loader))
 
     result = tuple(result)
-    scores = metric.offline_evaluate(result)
+    result = tuple(pool.map(metric._teds, result))
 
-    return dict(scores=scores, items=result)
+    scores = metric.compute_metrics(result)
+    return dict(scores=scores, data=result)
 
 
 def process(config: str, weight: str, split: str, store: str):

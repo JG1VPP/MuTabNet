@@ -64,7 +64,7 @@ class TEDS(BaseMetric):
         html = self.score(y, t, struct=True)
         full = self.score(y, t, struct=False)
 
-        return dict(html=html, full=full)
+        return dict(data=result, html=html, full=full)
 
     def score(self, pred, real, struct=False, **kwargs):
         parser = html.HTMLParser(encoding="utf-8")
