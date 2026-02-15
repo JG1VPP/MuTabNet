@@ -33,6 +33,7 @@ class TableScanner(BaseModel):
 
         # special tokens (html)
         decoder.update(SOC_HTML=self.handler.SOC_HTML)
+        decoder.update(PAD_HTML=self.handler.html.PAD)
         decoder.update(SOS_HTML=self.handler.html.SOS)
         decoder.update(EOS_HTML=self.handler.html.EOS)
 

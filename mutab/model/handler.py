@@ -82,6 +82,7 @@ class TableHandler(nn.Module):
         html = self.tensor("html", batch, self.encode_html)
         cell = self.tensor("cell", batch, self.encode_cell)
         bbox = self.tensor("bbox", batch, self.encode_bbox)
+        time = self.tensor("time", batch, self.encode_time)
 
         # align
         bbox = F.pad(bbox, pad=(1, 1)).mT
@@ -92,9 +93,12 @@ class TableHandler(nn.Module):
         # tasks
         item.update(html=html)
         item.update(back=html.fliplr())
+        item.update(edit=html)
+        item.update(dupe=html)
         item.update(cell=cell)
         item.update(bbox=bbox)
         item.update(zone=bbox)
+        item.update(time=time)
 
         return item
 
@@ -129,6 +133,9 @@ class TableHandler(nn.Module):
     def encode_bbox(self, batch):
         batch = map(torch.from_numpy, batch)
         return tuple(box.T for box in batch)
+
+    def encode_time(self, batch):
+        return torch.as_tensor(tuple(batch)).unsqueeze(1)
 
     def decode_html(self, html, **kwargs):
         return self.html.reverse(html)

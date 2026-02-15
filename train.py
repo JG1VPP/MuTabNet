@@ -35,7 +35,6 @@ def process(config: str, work_dir: str):
 
     # train
     runner.train()
-    runner.test()
 
 
 if __name__ == "__main__":

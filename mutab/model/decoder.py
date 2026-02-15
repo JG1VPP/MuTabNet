@@ -11,15 +11,18 @@ class TableDecoder(nn.Module):
     def __init__(
         self,
         d_model: int,
+        num_box: int,
         html_decoder,
         cell_decoder,
         html_fetcher,
+        html_updater,
         bbox_locator,
         num_emb_html: int,
         num_emb_cell: int,
         max_len_html: int,
         max_len_cell: int,
         SOC_HTML: List[int],
+        PAD_HTML: int,
         SOS_HTML: int,
         EOS_HTML: int,
         SOS_CELL: int,
@@ -33,11 +36,14 @@ class TableDecoder(nn.Module):
         html_decoder.update(d_model=d_model)
         cell_decoder.update(d_model=d_model)
         html_fetcher.update(d_model=d_model)
+        html_updater.update(d_model=d_model)
         bbox_locator.update(d_model=d_model)
+        bbox_locator.update(num_box=num_box)
 
         # alphabet
         html_decoder.update(num_emb=num_emb_html)
         cell_decoder.update(num_emb=num_emb_cell)
+        html_updater.update(num_emb=num_emb_html)
 
         # capacity
         html_decoder.update(max_len=max_len_html)
@@ -55,14 +61,19 @@ class TableDecoder(nn.Module):
         html_fetcher.update(SOC=SOC_HTML)
         html_fetcher.update(EOS=EOS_HTML)
 
+        html_updater.update(PAD=PAD_HTML)
+        html_updater.update(EOS=EOS_HTML)
+
         # input channels
         html_decoder.update(d_input=d_model + 2)
         cell_decoder.update(d_input=d_model * 2)
+        html_updater.update(d_input=num_box * 4)
 
         # networks
         self.html = build(html_decoder, **kwargs)
         self.cell = build(cell_decoder, **kwargs)
         self.grid = build(html_fetcher, **kwargs)
+        self.edit = build(html_updater, **kwargs)
         self.bbox = build(bbox_locator, **kwargs)
 
         # LtoR or RtoL
@@ -75,11 +86,12 @@ class TableDecoder(nn.Module):
         else:
             return self._valid(**kwargs, train=train)
 
-    def _train(self, img, html, back, cell, **kwargs):
+    def _train(self, img, html, back, cell, time, **kwargs):
         # ground truth
         html = html.to(img.device)
         back = back.to(img.device)
         cell = cell.to(img.device)
+        time = time.to(img.device)
 
         # remove [EOS]
         s_html = html[:, :-1]
@@ -97,9 +109,13 @@ class TableDecoder(nn.Module):
         h_html, o_html = self.html(img, s_html, h_LtoR)
         h_back, o_back = self.html(img, e_back, h_RtoL)
 
-        # structure refinement
+        # structure completion
         h_bbox, h_grid = self.grid(img, h_html, e_html)
         o_bbox, o_zone = self.bbox(img, h_bbox, h_html)
+
+        # structure correction
+        o_edit = self.edit(img, e_html, o_bbox, time)
+        o_dupe = self.edit(img, e_html, o_bbox, time)
 
         # character prediction
         h_cell, o_cell = self.cell(img, s_cell, h_grid)
@@ -107,6 +123,8 @@ class TableDecoder(nn.Module):
         return dict(
             html=o_html,
             back=o_back,
+            edit=o_edit,
+            dupe=o_dupe,
             cell=o_cell,
             bbox=o_bbox,
             zone=o_zone,
@@ -119,9 +137,12 @@ class TableDecoder(nn.Module):
         # structure prediction
         h_html, o_html = self.html.predict(img, h_LtoR)
 
-        # structure refinement
+        # structure completion
         h_bbox, h_grid = self.grid(img, h_html, o_html)
         o_bbox, o_zone = self.bbox(img, h_bbox, h_html)
+
+        # structure correction
+        o_html = self.edit.predict(img, o_html, o_bbox)
 
         # character prediction
         h_cell, o_cell = self.cell.predict(img, h_grid)

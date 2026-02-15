@@ -52,13 +52,16 @@ class CELoss(Loss):
 class KLLoss(Loss):
     label = "loss_kl_{}"
 
-    def function(self, ignore: int, rev: str, **kwargs):
+    def function(self, ignore: int, rev: str, flip: bool, **kwargs):
         # key
         self.rev = rev
 
         # PAD
         pad = torch.tensor(ignore).int()
         self.register_buffer("PAD", pad)
+
+        # flip
+        self.flip = flip
 
         # prob
         self.p = nn.Softmax(dim=2)
@@ -70,11 +73,15 @@ class KLLoss(Loss):
     def format(self, outputs, targets):
         # outputs [N, L, C]
         logit_f = outputs[self.key][:, :-1]
-        logit_b = outputs[self.rev][:, :-1].fliplr()
+        logit_b = outputs[self.rev][:, :-1]
 
         # detect PAD
         text = targets[self.key][:, 1:-1]
         mask = text.ne(self.PAD).unsqueeze(-1)
+
+        # flip
+        if self.flip:
+            logit_b = logit_b.fliplr()
 
         # P: target
         # Q: output

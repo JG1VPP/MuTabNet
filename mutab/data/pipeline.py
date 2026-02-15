@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import partial
 from itertools import product, starmap
+from random import random
 from typing import Sequence
 
 import numpy as np
@@ -124,6 +125,12 @@ class RollBbox(TableTransform):
         bbox = np.roll(bbox, shift=-h, axis=1)
 
         return np.vstack(bbox)
+
+
+@TRANSFORMS.register_module()
+class TimeStep(TableTransform):
+    def progress(self, **kwargs):
+        return dict(time=random())
 
 
 @TRANSFORMS.register_module()

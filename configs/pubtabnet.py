@@ -86,11 +86,29 @@ model = dict(
                 ),
             ],
         ),
+        html_updater=dict(
+            type="TableCellUpdater",
+            blocks=[
+                dict(
+                    att1=dict(type="GlobalAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+                dict(
+                    att1=dict(type="GlobalAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+                dict(
+                    att1=dict(type="GlobalAttention"),
+                    att2=dict(type="GlobalAttention"),
+                ),
+            ],
+        ),
         bbox_locator=dict(type="TableCellLocator"),
         heads=8,
         window=300,
         d_model=512,
         dropout=0.2,
+        steps=20,
         max_len_html=max_len_html,
         max_len_cell=max_len_cell,
         num_box=look_around_rows * look_around_cols,
@@ -98,10 +116,14 @@ model = dict(
     html_loss=[
         dict(type="CELoss", key="html"),
         dict(type="CELoss", key="back"),
-        dict(type="KLLoss", key="html", rev="back"),
-        dict(type="KLLoss", key="back", rev="html"),
-        dict(type="BBLoss", key="bbox", cls="html"),
-        dict(type="BBLoss", key="zone", cls="html"),
+        dict(type="CELoss", key="edit"),
+        dict(type="CELoss", key="dupe"),
+        dict(type="KLLoss", key="html", rev="back", flip=True),
+        dict(type="KLLoss", key="back", rev="html", flip=True),
+        dict(type="KLLoss", key="edit", rev="dupe", flip=False),
+        dict(type="KLLoss", key="dupe", rev="edit", flip=False),
+        dict(type="BBLoss", key="bbox", cls="edit"),
+        dict(type="BBLoss", key="zone", cls="edit"),
     ],
     cell_loss=[
         dict(type="CELoss", key="cell"),
@@ -173,6 +195,7 @@ pipeline = [
     dict(type="Pad", size=(520, 520)),
     dict(type="FormBbox"),
     dict(type="Hardness"),
+    dict(type="TimeStep"),
     dict(type="ToGrid"),
     dict(type="ToOTSL"),
     dict(
@@ -197,6 +220,7 @@ pipeline = [
             "html",
             "cell",
             "bbox",
+            "time",
         ],
     ),
 ]
