@@ -56,7 +56,7 @@ class TableDecoder(nn.Module):
         html_fetcher.update(EOS=EOS_HTML)
 
         # input channels
-        html_decoder.update(d_input=d_model + 2)
+        html_decoder.update(d_input=d_model + 4)
         cell_decoder.update(d_input=d_model * 2)
 
         # networks
@@ -66,8 +66,12 @@ class TableDecoder(nn.Module):
         self.bbox = build(bbox_locator, **kwargs)
 
         # LtoR or RtoL
-        self.register_buffer("LtoR", torch.eye(2)[0])
-        self.register_buffer("RtoL", torch.eye(2)[1])
+        self.register_buffer("LtoR", torch.eye(4)[0])
+        self.register_buffer("RtoL", torch.eye(4)[1])
+
+        # drop or rise
+        self.register_buffer("DROP", torch.eye(4)[2])
+        self.register_buffer("RISE", torch.eye(4)[3])
 
     def forward(self, train: bool, **kwargs):
         if train:
@@ -75,27 +79,37 @@ class TableDecoder(nn.Module):
         else:
             return self._valid(**kwargs, train=train)
 
-    def _train(self, img, html, back, cell, **kwargs):
+    def _train(self, img, html, back, vtml, flip, cell, **kwargs):
         # ground truth
         html = html.to(img.device)
         back = back.to(img.device)
+        vtml = vtml.to(img.device)
+        flip = flip.to(img.device)
         cell = cell.to(img.device)
 
         # remove [EOS]
         s_html = html[:, :-1]
         e_back = back[:, :-1]
+        s_vtml = vtml[:, :-1]
+        e_flip = flip[:, :-1]
         s_cell = cell[:, :-1]
 
         # remove [SOS]
         e_html = html[:, 1::]
 
         # LtoR or RtoL
-        h_LtoR = self.LtoR.expand(len(img), 1, 2)
-        h_RtoL = self.RtoL.expand(len(img), 1, 2)
+        h_LtoR = self.LtoR.expand(len(img), 1, 4)
+        h_RtoL = self.RtoL.expand(len(img), 1, 4)
+
+        # drop or rise
+        h_DROP = self.DROP.expand(len(img), 1, 4)
+        h_RISE = self.RISE.expand(len(img), 1, 4)
 
         # structure prediction
         h_html, o_html = self.html(img, s_html, h_LtoR)
         h_back, o_back = self.html(img, e_back, h_RtoL)
+        h_vtml, o_vtml = self.html(img, s_vtml, h_DROP)
+        h_flip, o_flip = self.html(img, e_flip, h_RISE)
 
         # structure refinement
         h_bbox, h_grid = self.grid(img, h_html, e_html)
@@ -107,6 +121,8 @@ class TableDecoder(nn.Module):
         return dict(
             html=o_html,
             back=o_back,
+            vtml=o_vtml,
+            flip=o_flip,
             cell=o_cell,
             bbox=o_bbox,
             zone=o_zone,
@@ -114,7 +130,7 @@ class TableDecoder(nn.Module):
 
     def _valid(self, img, **kwargs):
         # LtoR
-        h_LtoR = self.LtoR.expand(len(img), 1, 2)
+        h_LtoR = self.LtoR.expand(len(img), 1, 4)
 
         # structure prediction
         h_html, o_html = self.html.predict(img, h_LtoR)

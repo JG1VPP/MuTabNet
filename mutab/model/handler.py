@@ -1,3 +1,5 @@
+from typing import Sequence
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,7 +14,7 @@ class TableHandler(nn.Module):
         self,
         html_dict: dict,
         cell_dict: dict,
-        SOC: str,
+        SOC: list[str],
         revisor: dict,
         outputs: list[str],
         targets: list[str],
@@ -22,29 +24,26 @@ class TableHandler(nn.Module):
         assert isinstance(html_dict, dict)
         assert isinstance(cell_dict, dict)
 
-        assert isinstance(SOC, str)
-
-        self.SOC = SOC
-
         self.html = build(html_dict)
         self.cell = build(cell_dict)
 
         self.revisor = build(revisor)
 
-        assert isinstance(outputs, list)
-        assert isinstance(targets, list)
+        assert isinstance(outputs, Sequence)
+        assert isinstance(targets, Sequence)
 
         self.outputs = outputs
         self.targets = targets
 
-    @property
-    def SOC_HTML(self):
-        token = self.SOC
+        assert isinstance(SOC, Sequence)
 
-        token = self.html.get_number(token)
-        token = self.html.get_tensor(token)
+        self.register_buffer("SOC_HTML", self.special(SOC))
 
-        return token
+    def special(self, token):
+        token = map(self.html.get_number, token)
+        token = map(self.html.get_tensor, token)
+
+        return torch.stack(tuple(token))
 
     def forward(self, img, targets, train: bool):
         if train:
@@ -80,8 +79,11 @@ class TableHandler(nn.Module):
 
     def _train(self, img, batch):
         html = self.tensor("html", batch, self.encode_html)
+        vtml = self.tensor("vtml", batch, self.encode_html)
         cell = self.tensor("cell", batch, self.encode_cell)
         bbox = self.tensor("bbox", batch, self.encode_bbox)
+
+        assert html.ne(self.html.UKN).all().item()
 
         # align
         bbox = F.pad(bbox, pad=(1, 1)).mT
@@ -92,6 +94,8 @@ class TableHandler(nn.Module):
         # tasks
         item.update(html=html)
         item.update(back=html.fliplr())
+        item.update(vtml=vtml)
+        item.update(flip=vtml.fliplr())
         item.update(cell=cell)
         item.update(bbox=bbox)
         item.update(zone=bbox)
@@ -138,4 +142,4 @@ class TableHandler(nn.Module):
         return self.cell.resolve(cell)
 
     def decode_bbox(self, bbox, html, **kwargs):
-        return bbox[html.eq(self.SOC_HTML)].cpu().numpy()
+        return bbox[torch.isin(html, self.SOC_HTML)].cpu().numpy()

@@ -94,8 +94,12 @@ model = dict(
     html_loss=[
         dict(type="CELoss", key="html"),
         dict(type="CELoss", key="back"),
+        dict(type="CELoss", key="vtml"),
+        dict(type="CELoss", key="flip"),
         dict(type="KLLoss", key="html", rev="back"),
         dict(type="KLLoss", key="back", rev="html"),
+        dict(type="KLLoss", key="vtml", rev="flip"),
+        dict(type="KLLoss", key="flip", rev="vtml"),
         dict(type="BBLoss", key="bbox", cls="html"),
         dict(type="BBLoss", key="zone", cls="html"),
     ],
@@ -112,11 +116,10 @@ model = dict(
             type="TableLexicon",
             load="alphabet/pubtabnet/character_alphabet.txt",
         ),
-        SOC="D",
+        SOC=["<td></td>", "<td"],
         revisor=dict(
             type="TableRevisor",
             pipeline=[
-                dict(type="ToHTML"),
                 dict(
                     type="TableCombine",
                     SOC=["<td></td>", "<td"],
@@ -169,7 +172,7 @@ pipeline = [
     dict(type="Pad", size=(520, 520)),
     dict(type="FormBbox"),
     dict(type="Hardness"),
-    dict(type="ToOTSL"),
+    dict(type="ToVTML"),
     dict(
         type="Normalize",
         mean=[128, 128, 128],
@@ -185,6 +188,7 @@ pipeline = [
             "img_shape",
             "type",
             "html",
+            "vtml",
             "cell",
             "bbox",
         ],

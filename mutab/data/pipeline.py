@@ -5,8 +5,9 @@ import numpy as np
 from mmcv.transforms import BaseTransform
 from mmengine import TRANSFORMS
 from mmengine.structures import BaseDataElement
+from more_itertools import chunked, collapse, transpose
 
-from mutab.table import html_to_otsl
+from mutab.table import html_to_otsl, otsl_to_html
 
 EASY = "simple"
 HARD = "complex"
@@ -99,3 +100,27 @@ class ToOTSL(TableTransform):
     def progress(self, html, bbox, **kwargs):
         otsl, bbox, _, _ = html_to_otsl(html, bbox)
         return dict(html=otsl, bbox=np.stack(bbox))
+
+
+@TRANSFORMS.register_module()
+class ToVTML(TableTransform):
+    def progress(self, html, bbox, **kwargs):
+        otsl, _, rows, cols = html_to_otsl(html, bbox)
+
+        otsl = chunked(map(self.switch, otsl), n=cols)
+        otsl = list(map(self.bottom, transpose(otsl)))
+        vtml = otsl_to_html(list(collapse(otsl[:-1])))
+
+        return dict(vtml=vtml)
+
+    def switch(self, cell):
+        if cell == "L":
+            return "U"
+
+        if cell == "U":
+            return "L"
+
+        return cell
+
+    def bottom(self, cells):
+        return (*cells, "R")
