@@ -2,15 +2,15 @@ import re
 from dataclasses import dataclass, field
 from itertools import product
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from more_itertools import transpose
 
 
 @dataclass
 class Rank:
-    row: int = 0
-    col: int = 0
+    row: Optional[int] = None
+    col: Optional[int] = None
 
 
 @dataclass
@@ -95,42 +95,51 @@ def rs(tag, row, end, seq, box):
     row[-1].span.rows = int(tag.group(1))
 
 
+def search_cell(row: List[Cell], col: int):
+    for cell in row:
+        if cell.rank.col == col:
+            return cell
+
+    for cell in row:
+        if cell.rank.col is None:
+            return cell
+
+
 def insert_cell(row: int, col: int, token: str, otsl):
     rank = Rank(row=row, col=col)
     cell = Cell(token, rank=rank)
-    otsl[row].insert(col, cell)
 
-    # shift right following cells
-    for cell in otsl[row][col + 1 :]:
-        cell.rank.col += 1
+    if row < len(otsl):
+        otsl[row].append(cell)
 
 
 def expand_cell(row: int, col: int, cell: Cell, otsl):
     rows = range(row, row + cell.span.rows)
     cols = range(col, col + cell.span.cols)
-    dlux = (("X", "U"), ("L", cell.kind))
-    otsl[row].pop(col)
+    dlux = (("X", "U"), ("L"))
 
     # insert DLUX tokens
     for y, x in product(rows, cols):
-        if y < len(otsl):
+        if x > col or y > row:
             u, l = int(row == y), int(col == x)
             insert_cell(y, x, dlux[u][l], otsl)
 
-    # copy original bbox
-    otsl[row][col].bbox = cell.bbox
+    # determine
+    cell.rank.row = row
+    cell.rank.col = col
 
     # increment
     return cell.span.cols
 
 
 def expand_otsl(otsl: List[List[Cell]]):
-    for y in reversed(range(len(otsl))):
+    for y, row in enumerate(otsl):
         x = 0
 
-        # prevent infinite loop
-        for cell in list(otsl[y]):
+        while cell := search_cell(row, x):
             x += expand_cell(y, x, cell, otsl)
+
+        row.sort(key=lambda v: v.rank.col)
 
     return otsl
 
