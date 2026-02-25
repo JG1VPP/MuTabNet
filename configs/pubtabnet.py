@@ -112,11 +112,10 @@ model = dict(
             type="TableLexicon",
             load="alphabet/pubtabnet/character_alphabet.txt",
         ),
-        SOC="D",
+        SOC=["<td></td>", "<td"],
         revisor=dict(
             type="TableRevisor",
             pipeline=[
-                dict(type="ToHTML"),
                 dict(
                     type="TableCombine",
                     SOC=["<td></td>", "<td"],
@@ -169,7 +168,6 @@ pipeline = [
     dict(type="Pad", size=(520, 520)),
     dict(type="FormBbox"),
     dict(type="Hardness"),
-    dict(type="ToOTSL"),
     dict(
         type="Normalize",
         mean=[128, 128, 128],
