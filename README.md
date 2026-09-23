@@ -1,6 +1,12 @@
 # MuTabNet
 
-End-to-End table OCR model using a hierarchical Transformer that outputs HTML tags and cell contents.
+Official implementation of ["Revisiting Structural Dependency in Autoregressive Multi-task Table Recognition via Order-Independent Cell-Level Representations"](https://doi.org/10.48550/arXiv.2606.17874) (**ICDAR 2026**).
+
+## Overview
+
+MuTabNet (2026) refines cell-level structural representations with global self-attention to accurately localize cells and decode their contents:
+
+![overview](overview.svg)
 
 ## Usage
 
@@ -97,6 +103,15 @@ See [LICENSE](LICENSE) for more details.
 ## Citation
 
 ```latex
+@inproceedings{ICDAR26KAT,
+  author={Takaya Kawakatsu},
+  title={Revisiting Structural Dependency in Autoregressive Multi-task Table Recognition via Order-Independent Cell-Level Representations},
+  booktitle={Document Analysis and Recognition -- ICDAR 2026},
+  publisher={Springer Nature Switzerland},
+  year={2026},
+  pages={165--180},
+}
+
 @inproceedings{ICDAR24KAT,
   author={Takaya Kawakatsu},
   title={Multi-Cell Decoder and Mutual Learning for Table Structure and Character Recognition},
@@ -106,3 +121,7 @@ See [LICENSE](LICENSE) for more details.
   pages={389--405},
 }
 ```
+
+## See Also
+
+[GryphOne (ECCV 2026)](https://github.com/JG1VPP/gryphone): our masked diffusion model for handwritten mathematical expression recognition.
